@@ -1,0 +1,21 @@
+{
+  "name": "smartblood",
+  "version": "1.0.0",
+  "description": "He thong dieu phoi hien mau nhan dao va du bao nhu cau mau khan cap",
+  "scripts": {
+    "dev": "npm run dev --prefix client",
+    "client": "npm run dev --prefix client",
+    "server": "npm run dev --prefix server",
+    "build": "npm run build --prefix client"
+  },
+  "keywords": [
+    "blood-donation",
+    "smartblood",
+    "react",
+    "vite",
+    "express",
+    "socketio"
+  ],
+  "author": "SmartBlood Team",
+  "license": "ISC"
+}
