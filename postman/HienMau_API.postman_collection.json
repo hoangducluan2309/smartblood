@@ -1,0 +1,452 @@
+{
+  "info": {
+    "_postman_id": "8f3b2a1c-9e7d-4b5a-9123-c4e5f6a7b8c9",
+    "name": "HienMau_API_Automated_Tests",
+    "description": "Bộ kiểm thử tự động toàn diện cho Hệ thống Điều phối Hiến máu & Dự báo Nhu cầu Máu khẩn cấp.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "donorToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "staffToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "appointmentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "requestId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "initialStockA",
+      "value": "0",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Auth - T01: Đăng ký Donor mới",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const randomId = Math.floor(Math.random() * 90000) + 10000;",
+              "pm.collectionVariables.set('uniqueEmail', `donor.auto.${randomId}@gmail.com`);",
+              "pm.collectionVariables.set('uniquePhone', `0988${randomId}`);",
+              "pm.collectionVariables.set('uniqueCccd', `0790900${randomId}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T01 - Trạng thái HTTP phải là 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test('T01 - Cấu trúc response chuẩn { success: true, message, data }', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data).to.be.an('object');",
+              "    pm.expect(jsonData.data.email).to.eql(pm.collectionVariables.get('uniqueEmail'));",
+              "    pm.expect(jsonData.data.vaiTro).to.eql('DONOR');",
+              "    pm.expect(jsonData.data).to.not.have.property('matKhauHash');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"hoTen\": \"Tình Nguyện Viên Tự Động\",\n  \"email\": \"{{uniqueEmail}}\",\n  \"matKhau\": \"Password@123\",\n  \"soDienThoai\": \"{{uniquePhone}}\",\n  \"cccd\": \"{{uniqueCccd}}\",\n  \"nhomMau\": \"A+\",\n  \"yeuToRh\": \"Duong\",\n  \"diaChi\": \"Quận Ninh Kiều, Cần Thơ\",\n  \"vaiTro\": \"DONOR\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "02. Auth - T02: Đăng nhập lấy Token Donor",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T02 - Trạng thái HTTP phải là 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('T02 - Trả về Access Token và lưu vào biến môi trường', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data.accessToken).to.be.a('string');",
+              "    pm.expect(jsonData.data.user.email).to.eql(pm.collectionVariables.get('uniqueEmail'));",
+              "    pm.expect(jsonData.data.user).to.not.have.property('matKhauHash');",
+              "    pm.collectionVariables.set('donorToken', jsonData.data.accessToken);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{uniqueEmail}}\",\n  \"matKhau\": \"Password@123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "03. Auth - Đăng nhập Staff & Admin Setup",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Setup - Đăng nhập Staff & Admin thành công', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const jsonData = pm.response.json();",
+              "    pm.collectionVariables.set('staffToken', jsonData.data.accessToken);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"staff.test@hienmau.vn\",\n  \"matKhau\": \"Password@123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "04. Auth - Đăng nhập Admin Setup",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Setup - Đăng nhập Admin thành công', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const jsonData = pm.response.json();",
+              "    pm.collectionVariables.set('adminToken', jsonData.data.accessToken);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin.dispatch@hienmau.vn\",\n  \"matKhau\": \"Password@123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "05. Donation - T04: Đặt lịch hẹn hợp lệ (201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T04 - Đặt lịch hẹn hợp lệ thành công (201 Created)', function () {",
+              "    pm.response.to.have.status(201);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data.trangThai).to.eql('ChoXacNhan');",
+              "    pm.expect(jsonData.data.luongMauHienMl).to.eql(350);",
+              "    pm.collectionVariables.set('appointmentId', jsonData.data.id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{donorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"suKienId\": 1,\n  \"ngayHen\": \"2026-10-15T08:30:00.000Z\",\n  \"khungGio\": \"08:00 - 09:30\",\n  \"luongMauHienMl\": 350,\n  \"tinhTrangSucKhoe\": \"Sức khỏe tốt, đủ điều kiện\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/donation-appointments",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "donation-appointments"]
+        }
+      }
+    },
+    {
+      "name": "06. Donation - T05: Cập nhật kết quả thành công & Cộng kho",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T05 - Hospital Staff cập nhật kết quả hiến thành công (200 OK)', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data.trangThai).to.eql('HoanThanh');",
+              "    pm.expect(jsonData.data.luongMauHienMl).to.eql(350);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{staffToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"trangThai\": \"THANH_CONG\",\n  \"luongMauThucTeMl\": 350,\n  \"donViLuuTru\": \"Kho Lưu Trữ Trung Tâm - TP.HCM\",\n  \"ghiChu\": \"Đã tiếp nhận và đóng túi an toàn 350ml máu A+\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/donation-appointments/{{appointmentId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "donation-appointments", "{{appointmentId}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "07. Donation - T03: Đặt lịch hẹn vi phạm quy tắc 84 ngày (Kỳ vọng 400)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T03 - Bị từ chối do chưa đủ 84 ngày (400 Bad Request)', function () {",
+              "    pm.response.to.have.status(400);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(false);",
+              "    pm.expect(jsonData.message).to.include('84 ngày');",
+              "    pm.expect(jsonData.data).to.eql(null);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{donorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"suKienId\": 2,\n  \"ngayHen\": \"2026-10-25T08:30:00.000Z\",\n  \"khungGio\": \"08:00 - 09:30\",\n  \"luongMauHienMl\": 350\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/donation-appointments",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "donation-appointments"]
+        }
+      }
+    },
+    {
+      "name": "08. Emergency - T06: Bệnh viện tạo yêu cầu máu khẩn (201)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T06 - Tạo yêu cầu máu khẩn cấp thành công (201 Created)', function () {",
+              "    pm.response.to.have.status(201);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data.trangThai).to.eql('DangCho');",
+              "    pm.expect(jsonData.data.soLuongCanMl).to.eql(350);",
+              "    pm.collectionVariables.set('requestId', jsonData.data.id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{staffToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"benhVienYeuCau\": \"Bệnh viện Chợ Rẫy\",\n  \"nhomMauCan\": \"A+\",\n  \"thanhPhanCan\": \"ToanPhan\",\n  \"soLuongCanMl\": 350,\n  \"mucDoKhanCap\": \"RAT_KHAN\",\n  \"lyDo\": \"Cấp cứu khẩn cấp ca xuất huyết dạ dày\",\n  \"hanChot\": \"2026-10-09T12:00:00.000Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/emergency-requests",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "emergency-requests"]
+        }
+      }
+    },
+    {
+      "name": "09. Emergency - T07: Admin điều phối xuất kho FEFO (200)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T07 - Điều phối xuất kho FEFO thành công (200 OK)', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data.yeuCau.trangThai).to.eql('DaDapUng');",
+              "    pm.expect(jsonData.data.tongLuongXuatMl).to.eql(350);",
+              "    pm.expect(jsonData.data.danhSachXuatKho).to.be.an('array').with.lengthOf.atLeast(1);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"donViVanChuyen\": \"Đội Xe Cứu Thương 115 Chợ Rẫy\",\n  \"ghiChu\": \"Vận chuyển hỏa tốc trong 45 phút\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/emergency-requests/{{requestId}}/dispatch",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "emergency-requests", "{{requestId}}", "dispatch"]
+        }
+      }
+    },
+    {
+      "name": "10. Security - T08: Donor gọi API Admin (Kỳ vọng 403 Forbidden)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T08 - RBAC chặn Donor truy cập chức năng Admin (403 Forbidden)', function () {",
+              "    pm.response.to.have.status(403);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(false);",
+              "    pm.expect(jsonData.data).to.eql(null);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{donorToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenSuKien\": \"Sự kiện trái phép của Donor\",\n  \"diaDiem\": \"TP.HCM\",\n  \"thoiGianBatDau\": \"2026-11-01T08:00:00.000Z\",\n  \"thoiGianKetThuc\": \"2026-11-01T17:00:00.000Z\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/donation-events",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "donation-events"]
+        }
+      }
+    },
+    {
+      "name": "11. Persistence - T09: Kiểm chứng tính bền vững & Tồn kho",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('T09 - Dữ liệu tồn kho toàn vẹn và hợp lệ (200 OK)', function () {",
+              "    pm.response.to.have.status(200);",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.data).to.be.an('array');",
+              "    const bloodA = jsonData.data.find(item => item.nhomMau === 'A+');",
+              "    pm.expect(bloodA).to.exist;",
+              "    pm.expect(bloodA.soLuongConLaiMl).to.be.at.least(0);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{staffToken}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/blood-inventories",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "blood-inventories"]
+        }
+      }
+    }
+  ]
+}

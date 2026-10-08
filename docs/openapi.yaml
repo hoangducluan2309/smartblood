@@ -1,0 +1,1084 @@
+openapi: 3.0.3
+info:
+  title: Hệ thống Điều phối Hiến máu Nhân đạo & Dự báo Nhu cầu Máu Khẩn cấp - Backend API
+  description: |
+    Tài liệu đặc tả API chuẩn OpenAPI 3.0.3 phục vụ phát triển giao diện Frontend và tích hợp dịch vụ.
+    Hỗ trợ đầy đủ các phân hệ:
+    - **Authentication & Authorization (RBAC)**: Đăng ký, Đăng nhập, Profile, Phân quyền JWT (ADMIN, HOSPITAL_STAFF, DONOR).
+    - **Quản lý Sự kiện & Lịch hẹn Hiến máu**: Quy tắc 84 ngày giữa các lần hiến, đồng bộ tồn kho tự động.
+    - **Tồn kho & Điều phối Cấp cứu**: Ma trận tương thích nhóm máu, xuất kho FEFO (First Expired First Out).
+    - **Dự báo & Cảnh báo Sớm**: Đánh giá nguy cơ thiếu hụt, truy vấn tình nguyện viên khẩn cấp đủ điều kiện.
+  version: 1.0.0
+  contact:
+    name: Đội ngũ Phát triển Backend
+    email: backend@hienmau.vn
+
+servers:
+  - url: http://localhost:5000
+    description: Máy chủ phát triển cục bộ (Local Development Server)
+
+tags:
+  - name: Auth
+    description: Quản lý xác thực và phân quyền người dùng
+  - name: Donation Events
+    description: Quản lý các chiến dịch, ngày hội hiến máu tình nguyện
+  - name: Donation Appointments
+    description: Đăng ký lịch hẹn hiến máu và cập nhật kết quả hiến
+  - name: Blood Inventories
+    description: Tra cứu dữ liệu tồn kho máu theo nguyên tắc FEFO
+  - name: Emergency Requests
+    description: Tiếp nhận và điều phối xuất kho các đơn cấp cứu máu khẩn cấp
+  - name: Forecasts
+    description: Phân tích dự báo nguy cơ thiếu hụt và tìm kiếm người hiến khẩn cấp
+
+paths:
+  # ============================================================================
+  # 1. AUTHENTICATION & AUTHORIZATION
+  # ============================================================================
+  /api/v1/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: Đăng ký tài khoản người dùng mới
+      description: Cho phép người dùng tạo tài khoản mới (mặc định vai trò DONOR).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDTO'
+      responses:
+        '201':
+          description: Đăng ký tài khoản thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/v1/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Đăng nhập hệ thống nhận JWT Access Token
+      description: Xác thực email, mật khẩu và trả về Access Token (thời hạn 1 ngày).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDTO'
+      responses:
+        '200':
+          description: Đăng nhập thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /api/v1/auth/profile:
+    get:
+      tags:
+        - Auth
+      summary: Lấy thông tin cá nhân của người dùng hiện tại
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lấy thông tin thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileSuccessResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  # ============================================================================
+  # 2. DONATION EVENTS
+  # ============================================================================
+  /api/v1/donation-events:
+    get:
+      tags:
+        - Donation Events
+      summary: Xem danh sách sự kiện hiến máu đang mở
+      parameters:
+        - name: all
+          in: query
+          description: Lấy tất cả sự kiện (bao gồm cả sự kiện đã kết thúc nếu true)
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Lấy danh sách sự kiện thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy danh sách sự kiện hiến máu thành công.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SuKienHienMau'
+    post:
+      tags:
+        - Donation Events
+      summary: Tạo sự kiện hiến máu mới (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSuKienDTO'
+      responses:
+        '201':
+          description: Tạo sự kiện thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Tạo sự kiện hiến máu thành công.
+                  data:
+                    $ref: '#/components/schemas/SuKienHienMau'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  # ============================================================================
+  # 3. DONATION APPOINTMENTS
+  # ============================================================================
+  /api/v1/donation-appointments:
+    post:
+      tags:
+        - Donation Appointments
+      summary: Đăng ký lịch hẹn hiến máu (Quy tắc 84 ngày)
+      description: Donor đăng ký lịch hẹn. Hệ thống kiểm tra khoảng cách lần hiến gần nhất tối thiểu 84 ngày.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLichHenDTO'
+      responses:
+        '201':
+          description: Đăng ký lịch hẹn thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đăng ký lịch hẹn hiến máu thành công.
+                  data:
+                    $ref: '#/components/schemas/LichHenHienMau'
+        '400':
+          description: Lỗi nghiệp vụ (ví dụ chưa đủ 84 ngày)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Chưa đủ khoảng cách tối thiểu 84 ngày kể từ lần hiến máu trước (Lần gần nhất 15/10/2026, cách 17 ngày).
+                data: null
+
+  /api/v1/donation-appointments/{id}/status:
+    put:
+      tags:
+        - Donation Appointments
+      summary: Cập nhật kết quả hiến máu & tự động cộng kho (Hospital Staff / Admin)
+      description: Cập nhật trạng thái (THANH_CONG/HoanThanh, BI_TU_CHOI/DaHuy, KhongDen). Khi thành công, tự động cộng túi máu vào KhoMau trong Transaction.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID lịch hẹn cần cập nhật
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLichHenStatusDTO'
+      responses:
+        '200':
+          description: Cập nhật kết quả thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cập nhật kết quả lịch hẹn và tồn kho thành công.
+                  data:
+                    $ref: '#/components/schemas/LichHenHienMau'
+
+  # ============================================================================
+  # 4. BLOOD INVENTORIES
+  # ============================================================================
+  /api/v1/blood-inventories:
+    get:
+      tags:
+        - Blood Inventories
+      summary: Xem tồn kho máu theo nguyên tắc FEFO (Admin / Hospital Staff)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lấy danh sách tồn kho thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy dữ liệu tồn kho máu thành công (sắp xếp FEFO).
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KhoMauWithWarning'
+
+  # ============================================================================
+  # 5. EMERGENCY REQUESTS & DISPATCH
+  # ============================================================================
+  /api/v1/emergency-requests:
+    post:
+      tags:
+        - Emergency Requests
+      summary: Bệnh viện tạo yêu cầu máu khẩn cấp (Hospital Staff / Admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmergencyRequestDTO'
+      responses:
+        '201':
+          description: Tạo yêu cầu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Tạo yêu cầu máu khẩn cấp thành công.
+                  data:
+                    $ref: '#/components/schemas/YeuCauMauKhanCap'
+
+  /api/v1/emergency-requests/{id}/dispatch:
+    post:
+      tags:
+        - Emergency Requests
+      summary: Điều phối xuất kho chi viện máu khẩn cấp (Chỉ Admin)
+      description: Kiểm tra ma trận tương thích nhóm máu, trừ kho theo FEFO và tạo lệnh điều phối vận chuyển trong Transaction.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID đơn yêu cầu máu khẩn cấp
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispatchEmergencyRequestDTO'
+      responses:
+        '200':
+          description: Điều phối xuất kho thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Điều phối xuất kho và tạo lệnh vận chuyển thành công.
+                  data:
+                    type: object
+                    properties:
+                      yeuCau:
+                        $ref: '#/components/schemas/YeuCauMauKhanCap'
+                      danhSachXuatKho:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DieuPhoiMau'
+                      tongLuongXuatMl:
+                        type: integer
+                        example: 700
+        '400':
+          description: Kho không đủ số lượng máu tương thích
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Kho không đủ số lượng máu tương thích cho nhóm A+. Cần 700ml, Hiện có 0ml, Còn thiếu 700ml.
+                data: null
+
+  # ============================================================================
+  # 6. FORECASTS & EARLY WARNING
+  # ============================================================================
+  /api/v1/forecasts/shortage-risk:
+    get:
+      tags:
+        - Forecasts
+      summary: Báo cáo phân tích nguy cơ thiếu hụt máu trên toàn hệ thống (Admin / Hospital Staff)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lấy báo cáo phân tích thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Phân tích và dự báo nguy cơ thiếu hụt máu thành công.
+                  data:
+                    $ref: '#/components/schemas/ShortageRiskReport'
+
+  /api/v1/forecasts/urgent-donors:
+    get:
+      tags:
+        - Forecasts
+      summary: Tìm kiếm tình nguyện viên khẩn cấp tương thích và đủ điều kiện (Admin / Hospital Staff)
+      description: Tra cứu tất cả tình nguyện viên có nhóm máu tương thích (theo ma trận truyền máu), đã đủ điều kiện >= 84 ngày hoặc chưa từng hiến.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: nhomMau
+          in: query
+          required: false
+          description: Nhóm máu cần tìm (ví dụ A+, B+, O-, AB+)
+          schema:
+            type: string
+            example: 'A+'
+      responses:
+        '200':
+          description: Tìm kiếm thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Tìm thấy 1 tình nguyện viên đủ điều kiện hiến máu cho nhóm A+.
+                  data:
+                    $ref: '#/components/schemas/UrgentDonorsSearchResult'
+
+# ==============================================================================
+# COMPONENTS (SCHEMAS, RESPONSES, SECURITY SCHEMES)
+# ==============================================================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Nhập chuỗi JWT Access Token (không cần thêm chữ 'Bearer ')
+
+  responses:
+    BadRequestError:
+      description: Yêu cầu không hợp lệ hoặc vi phạm quy tắc nghiệp vụ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Dữ liệu gửi lên không hợp lệ.
+            data: null
+
+    UnauthorizedError:
+      description: Chưa xác thực hoặc Token không hợp lệ / đã hết hạn
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Vui lòng đăng nhập để thực hiện chức năng này.
+            data: null
+
+    ForbiddenError:
+      description: Không có quyền truy cập chức năng này
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Bạn không có quyền thực hiện hành động này.
+            data: null
+
+    NotFoundError:
+      description: Tài nguyên không tồn tại
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Tài nguyên yêu cầu không tồn tại.
+            data: null
+
+    ConflictError:
+      description: Trùng lặp dữ liệu (Email, SĐT, CCCD)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Email này đã được sử dụng trong hệ thống.
+            data: null
+
+    InternalServerError:
+      description: Lỗi máy chủ nội bộ
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Lỗi máy chủ nội bộ. Vui lòng thử lại sau.
+            data: null
+
+  schemas:
+    # --- Base Response Wrappers ---
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - message
+        - data
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Đã xảy ra lỗi khi xử lý yêu cầu.
+        data:
+          type: 'null'
+          example: null
+
+    # --- User & Auth Schemas ---
+    RegisterDTO:
+      type: object
+      required:
+        - hoTen
+        - email
+        - matKhau
+        - soDienThoai
+      properties:
+        hoTen:
+          type: string
+          example: Nguyễn Văn Hùng
+        email:
+          type: string
+          format: email
+          example: hung.nguyen@gmail.com
+        matKhau:
+          type: string
+          format: password
+          minLength: 6
+          example: Password@123
+        soDienThoai:
+          type: string
+          example: '0987111222'
+        cccd:
+          type: string
+          example: '079090001234'
+        nhomMau:
+          type: string
+          enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+          example: 'O+'
+        yeuToRh:
+          type: string
+          enum: ['Duong', 'Am', 'Rh+', 'Rh-']
+          example: 'Duong'
+        diaChi:
+          type: string
+          example: Quận 10, TP.HCM
+        vaiTro:
+          type: string
+          enum: ['ADMIN', 'HOSPITAL_STAFF', 'DONOR']
+          default: 'DONOR'
+          example: 'DONOR'
+
+    LoginDTO:
+      type: object
+      required:
+        - email
+        - matKhau
+      properties:
+        email:
+          type: string
+          format: email
+          example: hung.nguyen@gmail.com
+        matKhau:
+          type: string
+          format: password
+          example: Password@123
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        hoTen:
+          type: string
+          example: Nguyễn Văn Hùng
+        email:
+          type: string
+          example: hung.nguyen@gmail.com
+        soDienThoai:
+          type: string
+          example: '0987111222'
+        cccd:
+          type: string
+          nullable: true
+          example: '079090001234'
+        nhomMau:
+          type: string
+          nullable: true
+          example: 'O+'
+        yeuToRh:
+          type: string
+          nullable: true
+          example: 'Duong'
+        diaChi:
+          type: string
+          nullable: true
+          example: Quận 10, TP.HCM
+        vaiTro:
+          type: string
+          example: 'DONOR'
+        trangThai:
+          type: string
+          example: 'HoatDong'
+
+    RegisterSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Đăng ký tài khoản thành công.
+        data:
+          $ref: '#/components/schemas/UserResponse'
+
+    LoginSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Đăng nhập thành công.
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            user:
+              $ref: '#/components/schemas/UserResponse'
+
+    ProfileSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Lấy thông tin tài khoản thành công.
+        data:
+          $ref: '#/components/schemas/UserResponse'
+
+    # --- Donation Schemas ---
+    CreateSuKienDTO:
+      type: object
+      required:
+        - tenSuKien
+        - diaDiem
+        - thoiGianBatDau
+        - thoiGianKetThuc
+      properties:
+        tenSuKien:
+          type: string
+          example: Ngày Hội Giọt Hồng Tình Nguyện 2026
+        moTa:
+          type: string
+          example: Chương trình vận động hiến máu trước dịp lễ.
+        diaDiem:
+          type: string
+          example: Nhà Văn Hóa Thanh Niên, Quận 1, TP.HCM
+        thoiGianBatDau:
+          type: string
+          format: date-time
+          example: '2026-10-15T08:00:00.000Z'
+        thoiGianKetThuc:
+          type: string
+          format: date-time
+          example: '2026-10-15T16:00:00.000Z'
+        soLuongDuKien:
+          type: integer
+          default: 50
+          example: 200
+
+    SuKienHienMau:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        tenSuKien:
+          type: string
+          example: Ngày Hội Giọt Hồng Tình Nguyện 2026
+        moTa:
+          type: string
+          nullable: true
+          example: Chương trình hiến máu nhân đạo.
+        diaDiem:
+          type: string
+          example: Nhà Văn Hóa Thanh Niên, Quận 1, TP.HCM
+        thoiGianBatDau:
+          type: string
+          format: date-time
+          example: '2026-10-15T08:00:00.000Z'
+        thoiGianKetThuc:
+          type: string
+          format: date-time
+          example: '2026-10-15T16:00:00.000Z'
+        soLuongDuKien:
+          type: integer
+          example: 200
+        soLuongDaDangKy:
+          type: integer
+          example: 25
+        trangThai:
+          type: string
+          enum: ['SapDienRa', 'DangDienRa', 'KetThuc', 'DaHuy']
+          example: 'SapDienRa'
+        nguoiTaoId:
+          type: integer
+          example: 1
+
+    CreateLichHenDTO:
+      type: object
+      required:
+        - ngayHen
+        - khungGio
+      properties:
+        suKienId:
+          type: integer
+          nullable: true
+          example: 1
+        ngayHen:
+          type: string
+          format: date-time
+          example: '2026-10-15T08:30:00.000Z'
+        khungGio:
+          type: string
+          example: '08:00 - 09:30'
+        luongMauHienMl:
+          type: integer
+          enum: [250, 350, 450]
+          default: 350
+          example: 350
+        tinhTrangSucKhoe:
+          type: string
+          example: Khỏe mạnh bình thường
+        ghiChu:
+          type: string
+          example: Đăng ký theo khung giờ sáng
+
+    UpdateLichHenStatusDTO:
+      type: object
+      required:
+        - trangThai
+      properties:
+        trangThai:
+          type: string
+          enum: ['THANH_CONG', 'HoanThanh', 'BI_TU_CHOI', 'DaHuy', 'KhongDen', 'DaXacNhan']
+          example: 'THANH_CONG'
+        luongMauThucTeMl:
+          type: integer
+          enum: [250, 350, 450]
+          example: 350
+        donViLuuTru:
+          type: string
+          example: Kho Lưu Trữ Trung Tâm - TP.HCM
+        ghiChu:
+          type: string
+          example: Đã lấy 350ml máu O+ an toàn
+
+    LichHenHienMau:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nguoiHienId:
+          type: integer
+          example: 4
+        suKienId:
+          type: integer
+          nullable: true
+          example: 1
+        ngayHen:
+          type: string
+          format: date-time
+          example: '2026-10-15T08:30:00.000Z'
+        khungGio:
+          type: string
+          example: '08:00 - 09:30'
+        luongMauHienMl:
+          type: integer
+          example: 350
+        tinhTrangSucKhoe:
+          type: string
+          example: Khỏe mạnh bình thường
+        trangThai:
+          type: string
+          example: 'HoanThanh'
+        ghiChu:
+          type: string
+          nullable: true
+          example: Đã lấy 350ml máu O+ an toàn
+
+    # --- Inventory & Emergency Schemas ---
+    KhoMauWithWarning:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        nhomMau:
+          type: string
+          example: 'O+'
+        thanhPhan:
+          type: string
+          example: 'ToanPhan'
+        soLuongConLaiMl:
+          type: integer
+          example: 4850
+        nguongCanhBaoMl:
+          type: integer
+          example: 1500
+        donViLuuTru:
+          type: string
+          example: Kho Lưu Trữ Trung Tâm - TP.HCM
+        canhBaoThieuMau:
+          type: boolean
+          example: false
+        trangThaiKho:
+          type: string
+          enum: ['DU_TRU_AN_TOAN', 'CANH_BAO_THIEU_MAU']
+          example: 'DU_TRU_AN_TOAN'
+
+    CreateEmergencyRequestDTO:
+      type: object
+      required:
+        - benhVienYeuCau
+        - nhomMauCan
+        - lyDo
+        - hanChot
+      properties:
+        benhVienYeuCau:
+          type: string
+          example: Bệnh viện Chợ Rẫy
+        nhomMauCan:
+          type: string
+          enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+          example: 'A+'
+        thanhPhanCan:
+          type: string
+          enum: ['ToanPhan', 'HongCau', 'TieuCau', 'HuyetTuong']
+          default: 'ToanPhan'
+          example: 'ToanPhan'
+        soLuongCanMl:
+          type: integer
+          example: 700
+        soLuongTui:
+          type: integer
+          example: 2
+        mucDoKhanCap:
+          type: string
+          enum: ['TRUNG_BINH', 'CAO', 'NGUY_CAP', 'RAT_KHAN', 'KHAN_CAP']
+          default: 'CAO'
+          example: 'RAT_KHAN'
+        lyDo:
+          type: string
+          example: Cấp cứu bệnh nhân tai nạn mất máu cấp
+        hanChot:
+          type: string
+          format: date-time
+          example: '2026-10-09T00:00:00.000Z'
+
+    YeuCauMauKhanCap:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        benhVienYeuCau:
+          type: string
+          example: Bệnh viện Chợ Rẫy
+        nguoiDaiDienId:
+          type: integer
+          example: 6
+        nhomMauCan:
+          type: string
+          example: 'A+'
+        thanhPhanCan:
+          type: string
+          example: 'ToanPhan'
+        soLuongCanMl:
+          type: integer
+          example: 700
+        mucDoKhanCap:
+          type: string
+          example: 'NGUY_CAP'
+        lyDo:
+          type: string
+          example: Cấp cứu bệnh nhân tai nạn mất máu cấp
+        hanChot:
+          type: string
+          format: date-time
+          example: '2026-10-09T00:00:00.000Z'
+        trangThai:
+          type: string
+          enum: ['DangCho', 'DangDieuPhoi', 'DaDapUng', 'DaHuy', 'HetHan']
+          example: 'DaDapUng'
+
+    DispatchEmergencyRequestDTO:
+      type: object
+      properties:
+        donViVanChuyen:
+          type: string
+          example: Xe Cấp Cứu 115 - Chợ Rẫy
+        thoiGianNhanDuKien:
+          type: string
+          format: date-time
+          example: '2026-10-08T16:25:00.000Z'
+        ghiChu:
+          type: string
+          example: Ưu tiên còi hụ vận chuyển khẩn cấp trong 30 phút
+
+    DieuPhoiMau:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        yeuCauId:
+          type: integer
+          example: 1
+        khoMauId:
+          type: integer
+          example: 2
+        nguoiDieuPhoiId:
+          type: integer
+          example: 1
+        soLuongXuatMl:
+          type: integer
+          example: 700
+        trangThaiVanChuyen:
+          type: string
+          enum: ['ChuanBi', 'DangGiao', 'DaNhan', 'ThatBai']
+          example: 'DangGiao'
+        donViVanChuyen:
+          type: string
+          example: Xe Cấp Cứu 115 - Chợ Rẫy
+        thoiGianXuat:
+          type: string
+          format: date-time
+          example: '2026-10-08T14:25:00.000Z'
+        thoiGianNhanDuKien:
+          type: string
+          format: date-time
+          example: '2026-10-08T16:25:00.000Z'
+
+    # --- Forecast Schemas ---
+    BloodGroupRiskDetail:
+      type: object
+      properties:
+        nhomMau:
+          type: string
+          example: 'O+'
+        tonKhoHienTaiMl:
+          type: integer
+          example: 4850
+        nguongAnToanMl:
+          type: integer
+          example: 1500
+        nhuCauDangChoMl:
+          type: integer
+          example: 0
+        tongLieuUocTinhConLaiMl:
+          type: integer
+          example: 4850
+        tiLeDapUngPhanTram:
+          type: integer
+          example: 323
+        mucDoNguyCo:
+          type: string
+          enum: ['AN_TOAN', 'NGUY_CO_THIEU', 'THIEU_NGHIEM_TRONG']
+          example: 'AN_TOAN'
+        khuyenNghi:
+          type: string
+          example: Trữ lượng máu ổn định, đủ khả năng đáp ứng nhu cầu điều trị thông thường.
+
+    ShortageRiskReport:
+      type: object
+      properties:
+        tongTonKhoToanHeThongMl:
+          type: integer
+          example: 11350
+        tongNhuCauDangChoMl:
+          type: integer
+          example: 0
+        soNhomMauThieuNghiemTrong:
+          type: integer
+          example: 4
+        chiTietTheoNhomMau:
+          type: array
+          items:
+            $ref: '#/components/schemas/BloodGroupRiskDetail'
+        thoiDiemDuBao:
+          type: string
+          format: date-time
+          example: '2026-10-08T14:28:00.000Z'
+
+    UrgentDonorItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 3
+        hoTen:
+          type: string
+          example: Nguyễn Văn An
+        email:
+          type: string
+          example: nguyenvanan.donor@gmail.com
+        soDienThoai:
+          type: string
+          example: '0903000003'
+        nhomMau:
+          type: string
+          example: 'A+'
+        yeuToRh:
+          type: string
+          example: 'Duong'
+        diaChi:
+          type: string
+          example: 123 Đường Nguyễn Huệ, Quận 1, TP.HCM
+        ngayHienGanNhat:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        soNgayKeTuLanHienTruoc:
+          type: integer
+          nullable: true
+          example: null
+        trangThaiSanSang:
+          type: boolean
+          example: true
+
+    UrgentDonorsSearchResult:
+      type: object
+      properties:
+        nhomMauCanTim:
+          type: string
+          example: 'A+'
+        nhomMauTuongThich:
+          type: array
+          items:
+            type: string
+          example: ['A+', 'A-', 'O+', 'O-']
+        tongSoLuongKhaDung:
+          type: integer
+          example: 1
+        danhSachNguoiHien:
+          type: array
+          items:
+            $ref: '#/components/schemas/UrgentDonorItem'
