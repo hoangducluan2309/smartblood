@@ -259,6 +259,144 @@ export class EmergencyService {
       };
     });
   }
+
+  /**
+   * 3. Tổng hợp số lượng tồn kho theo 8 nhóm máu (Summary)
+   */
+  async layTongHopTonKho() {
+    const bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-'];
+    const inventories = await KhoMau.findAll();
+
+    return bloodGroups.map((group) => {
+      const itemsOfGroup = inventories.filter((i) => i.nhomMau === group);
+      const totalMl = itemsOfGroup.reduce((sum, i) => sum + i.soLuongConLaiMl, 0);
+      const totalSafeMl = itemsOfGroup.reduce((sum, i) => sum + i.nguongCanhBaoMl, 0) || (group.endsWith('-') ? 1000 : 1500);
+      
+      const soLuongTui = Math.round(totalMl / 350);
+      const nguongAnToan = Math.round(totalSafeMl / 350) || 10;
+      const phanTram = Math.min(100, Math.round((totalMl / totalSafeMl) * 100));
+      
+      const isCritical = totalMl < totalSafeMl * 0.5;
+      const isWarning = !isCritical && totalMl < totalSafeMl;
+
+      return {
+        nhomMau: group,
+        bloodGroup: group,
+        soLuongTui,
+        unitsAvailable: soLuongTui,
+        soLuongMl: totalMl,
+        nguongAnToan,
+        safeThreshold: nguongAnToan,
+        phanTram,
+        mucDo: isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'SAFE',
+        status: isCritical ? 'CRITICAL' : isWarning ? 'WARNING' : 'SAFE',
+        tuiSapHetHan: itemsOfGroup.filter((i) => {
+          const diffDays = Math.ceil((new Date(i.ngayCapNhat).getTime() - Date.now()) / (1000 * 3600 * 24));
+          return diffDays <= 5;
+        }).length,
+      };
+    });
+  }
+
+  /**
+   * 4. Thêm mới túi máu / mặt hàng vào kho máu (Admin)
+   */
+  async themMoiTonKho(data: {
+    nhomMau: string;
+    thanhPhan?: 'ToanPhan' | 'HongCau' | 'TieuCau' | 'HuyetTuong';
+    soLuongConLaiMl: number;
+    nguongCanhBaoMl?: number;
+    donViLuuTru: string;
+  }) {
+    const { nhomMau, thanhPhan = 'ToanPhan', soLuongConLaiMl, nguongCanhBaoMl = 500, donViLuuTru } = data;
+
+    if (!nhomMau || !donViLuuTru || soLuongConLaiMl === undefined) {
+      throw AppError.badRequest('Vui lòng cung cấp nhóm máu, đơn vị lưu trữ và thể tích túi máu.');
+    }
+
+    const cleanNhomMau = nhomMau.trim().replace(/\s+/g, '+').toUpperCase();
+    if (!['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].includes(cleanNhomMau)) {
+      throw AppError.badRequest('Nhóm máu không hợp lệ (A+, A-, B+, B-, AB+, AB-, O+, O-).');
+    }
+
+    if (soLuongConLaiMl < 0) {
+      throw AppError.badRequest('Thể tích máu không được nhỏ hơn 0.');
+    }
+
+    // Kiểm tra xem đã tồn tại bộ (nhomMau, thanhPhan, donViLuuTru) chưa theo ràng buộc UNIQUE
+    let item = await KhoMau.findOne({
+      where: {
+        nhomMau: cleanNhomMau,
+        thanhPhan,
+        donViLuuTru: donViLuuTru.trim(),
+      },
+    });
+
+    if (item) {
+      item.soLuongConLaiMl += Number(soLuongConLaiMl);
+      if (nguongCanhBaoMl !== undefined) item.nguongCanhBaoMl = Number(nguongCanhBaoMl);
+      await item.save();
+      return item;
+    }
+
+    return KhoMau.create({
+      nhomMau: cleanNhomMau,
+      thanhPhan,
+      soLuongConLaiMl: Number(soLuongConLaiMl),
+      nguongCanhBaoMl: Number(nguongCanhBaoMl),
+      donViLuuTru: donViLuuTru.trim(),
+    });
+  }
+
+  /**
+   * 5. Chỉnh sửa thông tin túi máu / thể tích trong kho (Admin)
+   */
+  async capNhatTonKho(id: number, data: {
+    soLuongConLaiMl?: number;
+    nguongCanhBaoMl?: number;
+    donViLuuTru?: string;
+    thanhPhan?: 'ToanPhan' | 'HongCau' | 'TieuCau' | 'HuyetTuong';
+  }) {
+    const item = await KhoMau.findByPk(id);
+    if (!item) {
+      throw AppError.notFound('Không tìm thấy túi máu / mặt hàng trong kho.');
+    }
+
+    if (data.soLuongConLaiMl !== undefined) {
+      if (data.soLuongConLaiMl < 0) {
+        throw AppError.badRequest('Thể tích máu không được nhỏ hơn 0.');
+      }
+      item.soLuongConLaiMl = Number(data.soLuongConLaiMl);
+    }
+
+    if (data.nguongCanhBaoMl !== undefined) {
+      item.nguongCanhBaoMl = Number(data.nguongCanhBaoMl);
+    }
+
+    if (data.donViLuuTru) {
+      item.donViLuuTru = data.donViLuuTru.trim();
+    }
+
+    if (data.thanhPhan) {
+      item.thanhPhan = data.thanhPhan;
+    }
+
+    await item.save();
+    return item;
+  }
+
+  /**
+   * 6. Xuất hủy / Xóa lô túi máu khỏi kho (Admin)
+   */
+  async xoaTonKho(id: number) {
+    const item = await KhoMau.findByPk(id);
+    if (!item) {
+      throw AppError.notFound('Không tìm thấy túi máu / mặt hàng trong kho.');
+    }
+
+    await item.destroy();
+    return { id, message: 'Đã xuất hủy / xóa lô túi máu khỏi kho thành công.' };
+  }
 }
 
 export const emergencyService = new EmergencyService();

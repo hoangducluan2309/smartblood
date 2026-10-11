@@ -19,12 +19,11 @@ router.post(
   (req, res, next) => authController.register(req, res, next)
 );
 
-// 2. Đăng nhập hệ thống (Có kiểm tra dữ liệu đầu vào)
+// 2. Đăng nhập hệ thống (Hỗ trợ Email, Số điện thoại hoặc CCCD)
 router.post(
   '/login',
   validateBody([
-    Validators.required('email', 'Email'),
-    Validators.email('email'),
+    Validators.loginIdentifier('email'),
     Validators.required('matKhau', 'Mật khẩu'),
   ]),
   (req, res, next) => authController.login(req, res, next)
