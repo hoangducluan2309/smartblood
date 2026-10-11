@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { Op } from 'sequelize';
 import { NguoiDung } from '../models/NguoiDung.js';
 import { hashPassword, comparePassword } from '../utils/password.util.js';
 import { AppError } from '../utils/AppError.js';
@@ -42,6 +43,32 @@ export class AuthService {
     // 4. Băm mật khẩu an toàn với bcrypt
     const matKhauHash = await hashPassword(matKhau);
 
+    // Chuẩn hóa nhóm máu và yếu tố Rh để tuân thủ CHECK CONSTRAINT trong CSDL:
+    // nhom_mau: ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-')
+    // yeu_to_rh: ('Duong', 'Am', 'Rh+', 'Rh-')
+    let normalizedNhomMau: string | null = null;
+    let normalizedRh: string | null = null;
+
+    if (nhomMau) {
+      const cleanMau = nhomMau.trim().toUpperCase();
+      if (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].includes(cleanMau)) {
+        normalizedNhomMau = cleanMau;
+        normalizedRh = cleanMau.endsWith('+') ? 'Rh+' : 'Rh-';
+      } else if (['A', 'B', 'AB', 'O'].includes(cleanMau)) {
+        const rhSign = (yeuToRh && (yeuToRh.includes('-') || yeuToRh.toLowerCase().includes('am'))) ? '-' : '+';
+        normalizedNhomMau = `${cleanMau}${rhSign}`;
+        normalizedRh = rhSign === '-' ? 'Rh-' : 'Rh+';
+      }
+    }
+
+    if (yeuToRh && !normalizedRh) {
+      if (yeuToRh === '+' || yeuToRh === 'Rh+' || yeuToRh.toLowerCase().includes('duong')) {
+        normalizedRh = 'Rh+';
+      } else if (yeuToRh === '-' || yeuToRh === 'Rh-' || yeuToRh.toLowerCase().includes('am')) {
+        normalizedRh = 'Rh-';
+      }
+    }
+
     // 5. Tạo người dùng mới
     const newUser = await NguoiDung.create({
       hoTen: hoTen.trim(),
@@ -49,8 +76,8 @@ export class AuthService {
       matKhauHash,
       soDienThoai: soDienThoai.trim(),
       cccd: cccd ? cccd.trim() : null,
-      nhomMau: nhomMau || null,
-      yeuToRh: yeuToRh || null,
+      nhomMau: normalizedNhomMau,
+      yeuToRh: normalizedRh,
       diaChi: diaChi ? diaChi.trim() : null,
       vaiTro: vaiTro || 'DONOR',
       trangThai: 'HoatDong',
@@ -63,16 +90,34 @@ export class AuthService {
    * Đăng nhập và cấp phát JWT Access Token (thời hạn 1 ngày)
    */
   async dangNhap(input: LoginDTO): Promise<LoginResponseDTO> {
-    const { email, matKhau } = input;
+    const matKhau = input.matKhau || input.password;
+    const identifier = (
+      input.email ||
+      input.taiKhoan ||
+      input.soDienThoai ||
+      input.cccd ||
+      input.identifier ||
+      input.phoneOrEmail ||
+      ''
+    ).trim();
 
-    if (!email || !matKhau) {
-      throw AppError.badRequest('Vui lòng nhập đầy đủ email và mật khẩu.');
+    if (!identifier || !matKhau) {
+      throw AppError.badRequest('Vui lòng nhập tài khoản (Email, Số điện thoại hoặc CCCD) và mật khẩu.');
     }
 
-    // 1. Tìm người dùng theo email
-    const user = await NguoiDung.findOne({ where: { email: email.trim().toLowerCase() } });
+    // 1. Tìm người dùng theo Email, Số điện thoại hoặc CCCD
+    const user = await NguoiDung.findOne({
+      where: {
+        [Op.or]: [
+          { email: identifier.toLowerCase() },
+          { soDienThoai: identifier },
+          { cccd: identifier },
+        ],
+      },
+    });
+
     if (!user) {
-      throw AppError.unauthorized('Email hoặc mật khẩu không chính xác.');
+      throw AppError.unauthorized('Tài khoản (Email, Số điện thoại, CCCD) hoặc mật khẩu không chính xác.');
     }
 
     // 2. Kiểm tra trạng thái tài khoản
@@ -83,7 +128,7 @@ export class AuthService {
     // 3. Kiểm tra mật khẩu
     const isPasswordValid = await comparePassword(matKhau, user.matKhauHash);
     if (!isPasswordValid) {
-      throw AppError.unauthorized('Email hoặc mật khẩu không chính xác.');
+      throw AppError.unauthorized('Tài khoản (Email, Số điện thoại, CCCD) hoặc mật khẩu không chính xác.');
     }
 
     // 4. Tạo JWT Access Token

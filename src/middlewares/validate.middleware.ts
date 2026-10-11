@@ -52,6 +52,16 @@ export const Validators = {
     };
   },
 
+  loginIdentifier: (field: string = 'email'): ValidationRule => {
+    return (data) => {
+      const val = String(data[field] || data.identifier || data.taiKhoan || data.soDienThoai || data.cccd || '').trim();
+      if (!val) {
+        return `Vui lòng nhập Email, Số điện thoại hoặc CCCD`;
+      }
+      return null;
+    };
+  },
+
   minLength: (field: string, min: number, fieldName: string): ValidationRule => {
     return (data) => {
       const val = String(data[field] || '').trim();

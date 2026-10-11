@@ -9,12 +9,47 @@ const emergencyRouter: Router = Router();
 // ==============================================================================
 // 1. TỒN KHO MÁU (/api/v1/blood-inventories)
 // ==============================================================================
+// Tổng hợp 8 nhóm máu (Summary)
+inventoryRouter.get(
+  '/summary',
+  (req, res, next) => emergencyController.getInventorySummary(req, res, next)
+);
+
 // Xem tồn kho máu (FEFO, Phân trang, Tìm kiếm, Lọc)
 inventoryRouter.get(
   '/',
   xacThucToken,
   phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => emergencyController.getInventories(req, res, next)
+);
+
+// Thêm mới túi máu vào kho (Admin)
+inventoryRouter.post(
+  '/',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  validateBody([
+    Validators.required('nhomMau', 'Nhóm máu'),
+    Validators.required('donViLuuTru', 'Đơn vị lưu trữ'),
+    Validators.required('soLuongConLaiMl', 'Thể tích máu'),
+  ]),
+  (req, res, next) => emergencyController.createInventory(req, res, next)
+);
+
+// Cập nhật số lượng hoặc thông tin lưu trữ túi máu (Admin)
+inventoryRouter.put(
+  '/:id',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  (req, res, next) => emergencyController.updateInventory(req, res, next)
+);
+
+// Xuất hủy / Xóa túi máu khỏi kho (Admin)
+inventoryRouter.delete(
+  '/:id',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  (req, res, next) => emergencyController.deleteInventory(req, res, next)
 );
 
 // ==============================================================================
