@@ -8,7 +8,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "check:db": "tsx src/scripts/check-db.ts"
+    "check:db": "tsx src/scripts/check-db.ts",
+    "test": "tsx src/scripts/run-unit-tests.ts"
   },
   "keywords": [
     "blood-donation",
