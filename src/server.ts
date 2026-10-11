@@ -8,6 +8,7 @@ import { errorMiddleware } from './middlewares/error.middleware.js';
 import { AppError } from './utils/AppError.js';
 
 import { authRoutes } from './routes/auth.routes.js';
+import { userRoutes } from './routes/user.routes.js';
 import { donationEventRoutes, donationAppointmentRoutes } from './routes/donation.routes.js';
 import { bloodInventoryRoutes, emergencyRequestRoutes } from './routes/emergency.routes.js';
 import { forecastRoutes } from './routes/forecast.routes.js';
@@ -63,8 +64,9 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
-// Authentication Routes
+// Authentication & User Management Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 
 // Donation Events & Appointments Routes
 app.use('/api/v1/donation-events', donationEventRoutes);

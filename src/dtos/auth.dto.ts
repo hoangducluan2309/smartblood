@@ -13,8 +13,14 @@ export interface RegisterDTO {
 }
 
 export interface LoginDTO {
-  email: string;
-  matKhau: string;
+  email?: string;
+  matKhau?: string;
+  password?: string;
+  soDienThoai?: string;
+  cccd?: string;
+  taiKhoan?: string;
+  identifier?: string;
+  phoneOrEmail?: string;
 }
 
 export interface UserResponseDTO {
