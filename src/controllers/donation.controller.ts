@@ -5,16 +5,35 @@ import { AppError } from '../utils/AppError.js';
 export class DonationController {
   /**
    * GET /api/v1/donation-events
-   * Public / Donor: Lấy danh sách các sự kiện hiến máu
+   * Public / Donor: Lấy danh sách các sự kiện hiến máu (Tìm kiếm, Lọc, Phân trang)
    */
   async getEvents(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const chiLayDangMo = req.query.all !== 'true';
-      const events = await donationService.layDanhSachSuKien(chiLayDangMo);
+      const result = await donationService.layDanhSachSuKien(req.query);
       res.status(200).json({
         success: true,
         message: 'Lấy danh sách sự kiện hiến máu thành công.',
-        data: events,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/donation-appointments
+   * Donor / Hospital Staff / Admin: Lấy danh sách lịch hẹn (Phân trang, lọc)
+   */
+  async getAppointments(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        throw AppError.unauthorized();
+      }
+      const result = await donationService.layDanhSachLichHen(req.query, req.user);
+      res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách lịch hẹn hiến máu thành công.',
+        data: result,
       });
     } catch (error) {
       next(error);

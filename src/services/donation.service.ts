@@ -2,23 +2,52 @@ import { Op, type Transaction } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { SuKienHienMau, LichHenHienMau, NguoiDung, KhoMau } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
-import type { CreateSuKienDTO, CreateLichHenDTO, UpdateLichHenStatusDTO, ResultStatusInput } from '../dtos/donation.dto.js';
+import type {
+  CreateSuKienDTO,
+  CreateLichHenDTO,
+  UpdateLichHenStatusDTO,
+  SuKienQueryDTO,
+  LichHenQueryDTO,
+} from '../dtos/donation.dto.js';
 import type { TrangThaiLichHen } from '../models/LichHenHienMau.js';
+import { parsePaginationParams, buildPaginatedResponse } from '../dtos/pagination.dto.js';
+import type { AuthUserPayload } from '../dtos/auth.dto.js';
 
 export class DonationService {
   /**
-   * 1. Lấy danh sách sự kiện hiến máu đang mở (SapDienRa, DangDienRa)
+   * 1. Lấy danh sách sự kiện hiến máu có Tìm kiếm, Lọc và Phân trang (Search, Filter, Pagination)
    */
-  async layDanhSachSuKien(chiLayDangMo: boolean = true) {
-    const whereClause = chiLayDangMo
-      ? {
-          trangThai: {
-            [Op.in]: ['SapDienRa', 'DangDienRa'],
-          },
-        }
-      : {};
+  async layDanhSachSuKien(query: SuKienQueryDTO = {}) {
+    const { page, limit, offset } = parsePaginationParams(query);
+    const whereClause: Record<string, unknown> = {};
 
-    return SuKienHienMau.findAll({
+    // 1. Lọc theo trạng thái
+    if (query.trangThai) {
+      whereClause.trangThai = query.trangThai;
+    }
+
+    // 2. Lọc theo khoảng ngày diễn ra
+    if (query.tuNgay || query.denNgay) {
+      const dateCondition: Record<symbol, unknown> = {};
+      if (query.tuNgay) {
+        dateCondition[Op.gte] = new Date(query.tuNgay);
+      }
+      if (query.denNgay) {
+        dateCondition[Op.lte] = new Date(query.denNgay);
+      }
+      whereClause.thoiGianBatDau = dateCondition;
+    }
+
+    // 3. Tìm kiếm theo tên sự kiện hoặc địa điểm (Op.like)
+    if (query.search && query.search.trim() !== '') {
+      const keyword = `%${query.search.trim()}%`;
+      whereClause[Op.or as unknown as string] = [
+        { tenSuKien: { [Op.like]: keyword } },
+        { diaDiem: { [Op.like]: keyword } },
+      ];
+    }
+
+    const { count, rows } = await SuKienHienMau.findAndCountAll({
       where: whereClause,
       include: [
         {
@@ -28,7 +57,57 @@ export class DonationService {
         },
       ],
       order: [['thoiGianBatDau', 'ASC']],
+      limit,
+      offset,
     });
+
+    return buildPaginatedResponse(rows, count, page, limit);
+  }
+
+  /**
+   * 1b. Lấy danh sách lịch hẹn hiến máu có Phân trang, Tìm kiếm, Lọc
+   * - DONOR: Chỉ xem lịch hẹn của chính mình
+   * - ADMIN / HOSPITAL_STAFF: Xem toàn bộ lịch hẹn
+   */
+  async layDanhSachLichHen(query: LichHenQueryDTO = {}, currentUser: AuthUserPayload) {
+    const { page, limit, offset } = parsePaginationParams(query);
+    const whereClause: Record<string, unknown> = {};
+
+    // Phân quyền dữ liệu
+    if (currentUser.vaiTro === 'DONOR') {
+      whereClause.nguoiHienId = currentUser.id;
+    } else if (query.nguoiHienId) {
+      whereClause.nguoiHienId = Number(query.nguoiHienId);
+    }
+
+    if (query.suKienId) {
+      whereClause.suKienId = Number(query.suKienId);
+    }
+
+    if (query.trangThai) {
+      whereClause.trangThai = query.trangThai;
+    }
+
+    const { count, rows } = await LichHenHienMau.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: NguoiDung,
+          as: 'nguoiHien',
+          attributes: ['id', 'hoTen', 'email', 'soDienThoai', 'nhomMau', 'yeuToRh'],
+        },
+        {
+          model: SuKienHienMau,
+          as: 'suKien',
+          attributes: ['id', 'tenSuKien', 'diaDiem', 'thoiGianBatDau'],
+        },
+      ],
+      order: [['ngayHen', 'DESC']],
+      limit,
+      offset,
+    });
+
+    return buildPaginatedResponse(rows, count, page, limit);
   }
 
   /**

@@ -5,15 +5,32 @@ import { AppError } from '../utils/AppError.js';
 export class EmergencyController {
   /**
    * GET /api/v1/blood-inventories
-   * Admin & Hospital Staff: Xem tồn kho máu theo FEFO
+   * Admin & Hospital Staff: Xem tồn kho máu theo FEFO (Tìm kiếm, Lọc, Phân trang)
    */
-  async getInventories(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getInventories(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const inventories = await emergencyService.layTonKhoMauFEFO();
+      const inventories = await emergencyService.layTonKhoMauFEFO(req.query);
       res.status(200).json({
         success: true,
         message: 'Lấy dữ liệu tồn kho máu thành công (sắp xếp FEFO).',
         data: inventories,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/emergency-requests
+   * Admin & Hospital Staff: Xem danh sách yêu cầu máu khẩn cấp (Tìm kiếm, Lọc, Phân trang)
+   */
+  async getRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await emergencyService.layDanhSachYeuCauKhanCap(req.query);
+      res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách yêu cầu máu khẩn cấp thành công.',
+        data: result,
       });
     } catch (error) {
       next(error);

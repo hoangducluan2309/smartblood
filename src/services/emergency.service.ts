@@ -7,22 +7,51 @@ import type {
   CreateEmergencyRequestDTO,
   DispatchEmergencyRequestDTO,
   MucDoKhanCapInput,
+  BloodInventoryQueryDTO,
+  EmergencyRequestQueryDTO,
 } from '../dtos/emergency.dto.js';
 import type { MucDoKhanCap } from '../models/YeuCauMauKhanCap.js';
+import { parsePaginationParams, buildPaginatedResponse } from '../dtos/pagination.dto.js';
 
 export class EmergencyService {
   /**
    * 1. Xem tồn kho máu theo nguyên tắc FEFO (Hạn sử dụng / Ngày cập nhật cũ nhất xuất trước)
+   * Có hỗ trợ Tìm kiếm, Lọc và Phân trang (Search, Filter, Pagination)
    */
-  async layTonKhoMauFEFO() {
-    const inventories = await KhoMau.findAll({
+  async layTonKhoMauFEFO(query: BloodInventoryQueryDTO = {}) {
+    const { page, limit, offset } = parsePaginationParams(query);
+    const whereClause: Record<string, unknown> = {};
+
+    // 1. Lọc theo nhóm máu
+    if (query.nhomMau) {
+      whereClause.nhomMau = query.nhomMau.trim().replace(/\s+/g, '+').toUpperCase();
+    }
+
+    // 2. Lọc theo thành phần máu
+    if (query.thanhPhan) {
+      whereClause.thanhPhan = query.thanhPhan;
+    }
+
+    // 3. Tìm kiếm theo đơn vị lưu trữ hoặc nhóm máu
+    if (query.search && query.search.trim() !== '') {
+      const keyword = `%${query.search.trim()}%`;
+      whereClause[Op.or as unknown as string] = [
+        { donViLuuTru: { [Op.like]: keyword } },
+        { nhomMau: { [Op.like]: keyword } },
+      ];
+    }
+
+    const { count, rows } = await KhoMau.findAndCountAll({
+      where: whereClause,
       order: [
         ['ngayCapNhat', 'ASC'], // FEFO
         ['nhomMau', 'ASC'],
       ],
+      limit,
+      offset,
     });
 
-    return inventories.map((item) => {
+    const items = rows.map((item) => {
       const isLowStock = item.soLuongConLaiMl <= item.nguongCanhBaoMl;
       return {
         ...item.toJSON(),
@@ -30,6 +59,55 @@ export class EmergencyService {
         trangThaiKho: isLowStock ? 'CANH_BAO_THIEU_MAU' : 'DU_TRU_AN_TOAN',
       };
     });
+
+    return buildPaginatedResponse(items, count, page, limit);
+  }
+
+  /**
+   * 1b. Xem danh sách yêu cầu máu khẩn cấp có Tìm kiếm, Lọc và Phân trang
+   */
+  async layDanhSachYeuCauKhanCap(query: EmergencyRequestQueryDTO = {}) {
+    const { page, limit, offset } = parsePaginationParams(query);
+    const whereClause: Record<string, unknown> = {};
+
+    if (query.trangThai) {
+      whereClause.trangThai = query.trangThai;
+    }
+
+    if (query.mucDoKhanCap) {
+      whereClause.mucDoKhanCap = query.mucDoKhanCap;
+    }
+
+    if (query.nhomMau) {
+      whereClause.nhomMauCan = query.nhomMau.trim().replace(/\s+/g, '+').toUpperCase();
+    }
+
+    if (query.search && query.search.trim() !== '') {
+      const keyword = `%${query.search.trim()}%`;
+      whereClause[Op.or as unknown as string] = [
+        { benhVienYeuCau: { [Op.like]: keyword } },
+        { lyDo: { [Op.like]: keyword } },
+      ];
+    }
+
+    const { count, rows } = await YeuCauMauKhanCap.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: NguoiDung,
+          as: 'nguoiDaiDien',
+          attributes: ['id', 'hoTen', 'email', 'soDienThoai'],
+        },
+      ],
+      order: [
+        ['mucDoKhanCap', 'DESC'],
+        ['hanChot', 'ASC'],
+      ],
+      limit,
+      offset,
+    });
+
+    return buildPaginatedResponse(rows, count, page, limit);
   }
 
   /**

@@ -107,19 +107,56 @@ paths:
   # ============================================================================
   # 2. DONATION EVENTS
   # ============================================================================
+  # ============================================================================
+  # 2. DONATION EVENTS
+  # ============================================================================
   /api/v1/donation-events:
     get:
       tags:
         - Donation Events
-      summary: Xem danh sách sự kiện hiến máu đang mở
+      summary: Xem danh sách sự kiện hiến máu (Tìm kiếm, Lọc, Phân trang)
       parameters:
-        - name: all
+        - name: page
           in: query
-          description: Lấy tất cả sự kiện (bao gồm cả sự kiện đã kết thúc nếu true)
+          description: Trang hiện tại (mặc định 1)
           required: false
           schema:
-            type: boolean
-            default: false
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Số lượng mỗi trang (mặc định 10, tối đa 100)
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: search
+          in: query
+          description: Từ khóa tìm kiếm theo tên sự kiện hoặc địa điểm
+          required: false
+          schema:
+            type: string
+        - name: trangThai
+          in: query
+          description: Lọc theo trạng thái sự kiện
+          required: false
+          schema:
+            type: string
+            enum: ['SapDienRa', 'DangDienRa', 'KetThuc', 'DaHuy']
+        - name: tuNgay
+          in: query
+          description: Lọc theo thời gian bắt đầu từ ngày (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: denNgay
+          in: query
+          description: Lọc theo thời gian bắt đầu đến ngày (YYYY-MM-DD)
+          required: false
+          schema:
+            type: string
+            format: date
       responses:
         '200':
           description: Lấy danh sách sự kiện thành công
@@ -135,9 +172,7 @@ paths:
                     type: string
                     example: Lấy danh sách sự kiện hiến máu thành công.
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/SuKienHienMau'
+                    $ref: '#/components/schemas/PaginatedSuKienResponse'
     post:
       tags:
         - Donation Events
@@ -166,6 +201,8 @@ paths:
                     example: Tạo sự kiện hiến máu thành công.
                   data:
                     $ref: '#/components/schemas/SuKienHienMau'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -175,6 +212,58 @@ paths:
   # 3. DONATION APPOINTMENTS
   # ============================================================================
   /api/v1/donation-appointments:
+    get:
+      tags:
+        - Donation Appointments
+      summary: Lấy danh sách lịch hẹn hiến máu (Donor xem của mình; Admin/Staff xem tất cả)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Trang hiện tại (mặc định 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Số lượng mỗi trang (mặc định 10)
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: trangThai
+          in: query
+          description: Lọc theo trạng thái lịch hẹn
+          required: false
+          schema:
+            type: string
+            enum: ['ChoXacNhan', 'DaXacNhan', 'HoanThanh', 'DaHuy', 'KhongDen']
+        - name: suKienId
+          in: query
+          description: Lọc theo ID sự kiện
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lấy danh sách lịch hẹn thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy danh sách lịch hẹn hiến máu thành công.
+                  data:
+                    $ref: '#/components/schemas/PaginatedLichHenResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
     post:
       tags:
         - Donation Appointments
@@ -205,7 +294,7 @@ paths:
                   data:
                     $ref: '#/components/schemas/LichHenHienMau'
         '400':
-          description: Lỗi nghiệp vụ (ví dụ chưa đủ 84 ngày)
+          description: Lỗi nghiệp vụ (ví dụ chưa đủ 84 ngày hoặc thiếu trường dữ liệu)
           content:
             application/json:
               schema:
@@ -264,6 +353,39 @@ paths:
       summary: Xem tồn kho máu theo nguyên tắc FEFO (Admin / Hospital Staff)
       security:
         - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Trang hiện tại (mặc định 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Số lượng mỗi trang (mặc định 10)
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: search
+          in: query
+          description: Từ khóa tìm kiếm theo đơn vị lưu trữ hoặc nhóm máu
+          required: false
+          schema:
+            type: string
+        - name: nhomMau
+          in: query
+          description: Lọc theo nhóm máu (A+, O-,...)
+          required: false
+          schema:
+            type: string
+        - name: thanhPhan
+          in: query
+          description: Lọc theo thành phần máu (ToanPhan, HongCau,...)
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Lấy danh sách tồn kho thành công
@@ -279,14 +401,79 @@ paths:
                     type: string
                     example: Lấy dữ liệu tồn kho máu thành công (sắp xếp FEFO).
                   data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/KhoMauWithWarning'
+                    $ref: '#/components/schemas/PaginatedKhoMauResponse'
 
   # ============================================================================
   # 5. EMERGENCY REQUESTS & DISPATCH
   # ============================================================================
   /api/v1/emergency-requests:
+    get:
+      tags:
+        - Emergency Requests
+      summary: Xem danh sách yêu cầu máu khẩn cấp (Admin & Hospital Staff)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Trang hiện tại (mặc định 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Số lượng mỗi trang (mặc định 10)
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: search
+          in: query
+          description: Từ khóa tìm kiếm theo tên bệnh viện hoặc lý do
+          required: false
+          schema:
+            type: string
+        - name: nhomMau
+          in: query
+          description: Lọc theo nhóm máu cần (A+, O-,...)
+          required: false
+          schema:
+            type: string
+        - name: mucDoKhanCap
+          in: query
+          description: Lọc theo mức độ khẩn cấp
+          required: false
+          schema:
+            type: string
+            enum: ['TRUNG_BINH', 'CAO', 'NGUY_CAP']
+        - name: trangThai
+          in: query
+          description: Lọc theo trạng thái yêu cầu
+          required: false
+          schema:
+            type: string
+            enum: ['DangCho', 'DaDapUng', 'DaHuy', 'HetHan']
+      responses:
+        '200':
+          description: Lấy danh sách yêu cầu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy danh sách yêu cầu máu khẩn cấp thành công.
+                  data:
+                    $ref: '#/components/schemas/PaginatedEmergencyRequestResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
     post:
       tags:
         - Emergency Requests
@@ -1082,3 +1269,67 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UrgentDonorItem'
+
+    # --- Phân trang Schemas (Pagination Models) ---
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        totalItems:
+          type: integer
+          example: 25
+        totalPages:
+          type: integer
+          example: 3
+        hasNextPage:
+          type: boolean
+          example: true
+        hasPrevPage:
+          type: boolean
+          example: false
+
+    PaginatedSuKienResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SuKienHienMau'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginatedLichHenResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LichHenHienMau'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginatedKhoMauResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/KhoMauWithWarning'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    PaginatedEmergencyRequestResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/YeuCauMauKhanCap'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
