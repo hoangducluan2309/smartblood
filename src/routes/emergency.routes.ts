@@ -56,6 +56,9 @@ inventoryRouter.delete(
 // 2. YÊU CẦU MÁU KHẨN CẤP (/api/v1/emergency-requests)
 // ==============================================================================
 
+// Xem danh sách ca cấp cứu công khai (Public / Không cần đăng nhập)
+emergencyRouter.get('/public', (req, res, next) => emergencyController.getPublicRequests(req, res, next));
+
 // Xem danh sách yêu cầu máu khẩn cấp (Admin & Hospital Staff - Hỗ trợ Tìm kiếm, Lọc, Phân trang)
 emergencyRouter.get(
   '/',
@@ -64,7 +67,7 @@ emergencyRouter.get(
   (req, res, next) => emergencyController.getRequests(req, res, next)
 );
 
-// Bệnh viện tạo yêu cầu máu (Hospital Staff / Admin - Có validation dữ liệu đầu vào)
+// Bệnh viện / Admin tạo yêu cầu máu (Hospital Staff / Admin - Có validation dữ liệu đầu vào)
 emergencyRouter.post(
   '/',
   xacThucToken,
@@ -84,6 +87,42 @@ emergencyRouter.post(
   xacThucToken,
   phanQuyen('ADMIN'),
   (req, res, next) => emergencyController.dispatchRequest(req, res, next)
+);
+
+// Bác sĩ & Admin có quyền tắt thẻ cấp cứu
+emergencyRouter.put(
+  '/:id/dismiss',
+  xacThucToken,
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
+  (req, res, next) => emergencyController.dismissRequest(req, res, next)
+);
+emergencyRouter.patch(
+  '/:id/dismiss',
+  xacThucToken,
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
+  (req, res, next) => emergencyController.dismissRequest(req, res, next)
+);
+
+// Bác sĩ & Admin khôi phục / mở lại thẻ cấp cứu
+emergencyRouter.put(
+  '/:id/restore',
+  xacThucToken,
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
+  (req, res, next) => emergencyController.restoreRequest(req, res, next)
+);
+emergencyRouter.patch(
+  '/:id/restore',
+  xacThucToken,
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
+  (req, res, next) => emergencyController.restoreRequest(req, res, next)
+);
+
+// Quản trị viên xóa vĩnh viễn yêu cầu cấp cứu (Admin)
+emergencyRouter.delete(
+  '/:id',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  (req, res, next) => emergencyController.deleteRequest(req, res, next)
 );
 
 export { inventoryRouter as bloodInventoryRoutes, emergencyRouter as emergencyRequestRoutes };

@@ -1,5 +1,7 @@
 import { Op } from 'sequelize';
+import { sequelize } from '../config/database.js';
 import { NguoiDung, type VaiTro, type TrangThaiUser } from '../models/NguoiDung.js';
+import { LichHenHienMau, SuKienHienMau, YeuCauMauKhanCap, DieuPhoiMau } from '../models/index.js';
 import { hashPassword } from '../utils/password.util.js';
 import { AppError } from '../utils/AppError.js';
 import { parsePaginationParams, buildPaginatedResponse } from '../dtos/pagination.dto.js';
@@ -211,7 +213,7 @@ export class UserService {
   /**
    * 5. Khóa hoặc Mở khóa nhanh tài khoản
    */
-  async thayDoiTrangThai(id: number, currentUserId: number) {
+  async thayDoiTrangThai(id: number, currentUserId: number): Promise<{ id: number; trangThai: string; message: string }> {
     if (id === currentUserId) {
       throw AppError.badRequest('Bạn không thể tự khóa tài khoản của chính mình.');
     }
@@ -236,8 +238,34 @@ export class UserService {
     const user = await NguoiDung.findByPk(id);
     if (!user) throw AppError.notFound('Không tìm thấy tài khoản người dùng.');
 
-    await user.destroy();
-    return { id, message: 'Đã xóa tài khoản người dùng thành công.' };
+    // Xử lý các liên kết phụ thuộc trong Transaction đảm bảo toàn vẹn dữ liệu
+    await sequelize.transaction(async (t) => {
+      // 1. Chuyển quyền đại diện các yêu cầu khẩn cấp sang Admin đang thao tác
+      await YeuCauMauKhanCap.update(
+        { nguoiDaiDienId: currentUserId },
+        { where: { nguoiDaiDienId: id }, transaction: t }
+      );
+
+      // 2. Chuyển quyền điều phối sang Admin đang thao tác
+      await DieuPhoiMau.update(
+        { nguoiDieuPhoiId: currentUserId },
+        { where: { nguoiDieuPhoiId: id }, transaction: t }
+      );
+
+      // 3. Chuyển quyền sở hữu sự kiện hiến máu sang Admin đang thao tác
+      await SuKienHienMau.update(
+        { nguoiTaoId: currentUserId },
+        { where: { nguoiTaoId: id }, transaction: t }
+      );
+
+      // 4. Tự động xóa các lịch hẹn hiến máu của tài khoản này
+      await LichHenHienMau.destroy({ where: { nguoiHienId: id }, transaction: t });
+
+      // 5. Xóa tài khoản người dùng
+      await user.destroy({ transaction: t });
+    });
+
+    return { id, message: `Đã xóa vĩnh viễn tài khoản [${user.hoTen}] thành công.` };
   }
 }
 

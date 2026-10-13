@@ -101,6 +101,103 @@ export class DonationController {
       next(error);
     }
   }
+
+  /**
+   * PUT /api/v1/donation-events/:id
+   * Admin: Cập nhật sự kiện hiến máu
+   */
+  async updateEvent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      if (isNaN(id)) throw AppError.badRequest('ID sự kiện không hợp lệ.');
+      const result = await donationService.capNhatSuKien(id, req.body);
+      res.status(200).json({
+        success: true,
+        message: 'Cập nhật sự kiện hiến máu thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/v1/donation-events/:id/status
+   * Admin: Cập nhật trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc)
+   */
+  async updateEventStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      if (isNaN(id)) throw AppError.badRequest('ID sự kiện không hợp lệ.');
+      const { trangThai, lyDo } = req.body;
+      if (!trangThai) throw AppError.badRequest('Vui lòng cung cấp trạng thái sự kiện.');
+      const result = await donationService.doiTrangThaiSuKien(id, trangThai, lyDo);
+      res.status(200).json({
+        success: true,
+        message: `Cập nhật trạng thái sự kiện thành công.`,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/donation-events/:id
+   * Admin: Xóa sự kiện hiến máu
+   */
+  async deleteEvent(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      if (isNaN(id)) throw AppError.badRequest('ID sự kiện không hợp lệ.');
+      const result = await donationService.xoaSuKien(id);
+      res.status(200).json({
+        success: true,
+        message: 'Xóa sự kiện hiến máu thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/donation-appointments/my-history
+   * Donor: Lấy lịch sử đăng ký hiến máu của chính mình
+   */
+  async getMyHistory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      const result = await donationService.layLichSuHienMauCuaToi(req.user.id);
+      res.status(200).json({
+        success: true,
+        message: 'Lấy lịch sử hiến máu thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/donation-appointments/:id
+   * Donor / Admin / Staff: Hủy lịch hẹn hiến máu
+   */
+  async deleteAppointment(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      const id = parseInt(req.params.id as string, 10);
+      if (isNaN(id)) throw AppError.badRequest('ID lịch hẹn không hợp lệ.');
+      const result = await donationService.xoaLichHen(id, req.user.id, req.user.vaiTro);
+      res.status(200).json({
+        success: true,
+        message: 'Hủy lịch hẹn thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const donationController = new DonationController();

@@ -9,6 +9,12 @@ export interface CreateSuKienDTO {
   thoiGianBatDau: string | Date;
   thoiGianKetThuc: string | Date;
   soLuongDuKien?: number;
+  trangThai?: TrangThaiSuKien;
+}
+
+export interface UpdateSuKienStatusDTO {
+  trangThai: TrangThaiSuKien;
+  lyDo?: string;
 }
 
 export interface SuKienQueryDTO extends PaginationQuery {

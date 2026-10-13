@@ -397,6 +397,75 @@ export class EmergencyService {
     await item.destroy();
     return { id, message: 'Đã xuất hủy / xóa lô túi máu khỏi kho thành công.' };
   }
+
+  /**
+   * 7. Tắt thẻ / Hủy yêu cầu cấp cứu (Bác sĩ & Admin)
+   */
+  async tatYeuCauKhanCap(id: number, lyDo?: string) {
+    const yeuCau = await YeuCauMauKhanCap.findByPk(id);
+    if (!yeuCau) {
+      throw AppError.notFound('Không tìm thấy yêu cầu máu cấp cứu.');
+    }
+
+    yeuCau.trangThai = 'DaHuy';
+    const note = lyDo ? ` [ĐÃ TẮT THẺ: ${lyDo.trim()}]` : ' [ĐÃ TẮT THẺ BỞI BÁC SĨ/ADMIN]';
+    if (!yeuCau.lyDo.includes('[ĐÃ TẮT THẺ')) {
+      yeuCau.lyDo = `${yeuCau.lyDo}${note}`.slice(0, 500);
+    }
+
+    await yeuCau.save();
+    return yeuCau;
+  }
+
+  /**
+   * 8. Khôi phục / Mở lại thẻ cấp cứu (Bác sĩ & Admin)
+   */
+  async khoiPhucYeuCauKhanCap(id: number) {
+    const yeuCau = await YeuCauMauKhanCap.findByPk(id);
+    if (!yeuCau) {
+      throw AppError.notFound('Không tìm thấy yêu cầu máu cấp cứu.');
+    }
+
+    yeuCau.trangThai = 'DangCho';
+    yeuCau.lyDo = yeuCau.lyDo.replace(/\s*\[ĐÃ TẮT THẺ[^\]]*\]/g, '').trim();
+    await yeuCau.save();
+    return yeuCau;
+  }
+
+  /**
+   * 9. Xóa yêu cầu cấp cứu (Admin)
+   */
+  async xoaYeuCauKhanCap(id: number) {
+    const yeuCau = await YeuCauMauKhanCap.findByPk(id);
+    if (!yeuCau) {
+      throw AppError.notFound('Không tìm thấy yêu cầu máu cấp cứu.');
+    }
+
+    await yeuCau.destroy();
+    return { id, message: 'Đã xóa yêu cầu cấp cứu thành công.' };
+  }
+
+  /**
+   * 10. Lấy danh sách ca cấp cứu công khai đang chờ (Dành cho Trang chủ & Trang cấp cứu)
+   */
+  async layDanhSachYeuCauKhanCapCongKhai() {
+    return YeuCauMauKhanCap.findAll({
+      where: {
+        trangThai: { [Op.in]: ['DangCho', 'DangDieuPhoi', 'DaHuy'] },
+      },
+      include: [
+        {
+          model: NguoiDung,
+          as: 'nguoiDaiDien',
+          attributes: ['id', 'hoTen', 'soDienThoai'],
+        },
+      ],
+      order: [
+        ['mucDoKhanCap', 'DESC'],
+        ['ngayCapNhat', 'DESC'],
+      ],
+    });
+  }
 }
 
 export const emergencyService = new EmergencyService();

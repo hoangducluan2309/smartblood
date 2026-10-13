@@ -28,22 +28,60 @@ eventRouter.post(
   (req, res, next) => donationController.createEvent(req, res, next)
 );
 
+// Cập nhật sự kiện (Chỉ ADMIN)
+eventRouter.put(
+  '/:id',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  (req, res, next) => donationController.updateEvent(req, res, next)
+);
+
+// Cập nhật trạng thái sự kiện: Tắt / Mở lại (Chỉ ADMIN)
+eventRouter.put(
+  '/:id/status',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  (req, res, next) => donationController.updateEventStatus(req, res, next)
+);
+
+eventRouter.patch(
+  '/:id/status',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  (req, res, next) => donationController.updateEventStatus(req, res, next)
+);
+
+// Xóa sự kiện (Chỉ ADMIN)
+eventRouter.delete(
+  '/:id',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  (req, res, next) => donationController.deleteEvent(req, res, next)
+);
+
 // ==============================================================================
 // 2. LỊCH HẸN HIẾN MÁU (/api/v1/donation-appointments)
 // ==============================================================================
 
-// Lấy danh sách lịch hẹn (DONOR xem của mình; ADMIN/HOSPITAL_STAFF xem tất cả)
+// Xem lịch sử hiến máu của chính mình (DONOR)
+appointmentRouter.get(
+  '/my-history',
+  xacThucToken,
+  (req, res, next) => donationController.getMyHistory(req, res, next)
+);
+
+// Lấy danh sách lịch hẹn (DONOR xem của mình; ADMIN/HOSPITAL_STAFF xem tất cả để duyệt)
 appointmentRouter.get(
   '/',
   xacThucToken,
   (req, res, next) => donationController.getAppointments(req, res, next)
 );
 
-// Đặt lịch hẹn hiến máu (Người dùng / Donor - Có validation dữ liệu đầu vào)
+// Đặt lịch hẹn hiến máu (Người dùng / Donor / Staff / Admin - Có validation dữ liệu đầu vào)
 appointmentRouter.post(
   '/',
   xacThucToken,
-  phanQuyen('DONOR', 'ADMIN'),
+  phanQuyen('DONOR', 'ADMIN', 'HOSPITAL_STAFF'),
   validateBody([
     Validators.required('ngayHen', 'Ngày hẹn'),
     Validators.required('khungGio', 'Khung giờ'),
@@ -60,6 +98,13 @@ appointmentRouter.put(
     Validators.required('trangThai', 'Trạng thái kết quả'),
   ]),
   (req, res, next) => donationController.updateAppointmentStatus(req, res, next)
+);
+
+// Hủy / Xóa lịch hẹn hiến máu (Donor / Staff / Admin)
+appointmentRouter.delete(
+  '/:id',
+  xacThucToken,
+  (req, res, next) => donationController.deleteAppointment(req, res, next)
 );
 
 export { eventRouter as donationEventRoutes, appointmentRouter as donationAppointmentRoutes };

@@ -8,6 +8,7 @@
     "dev": "vite",
     "dev:server": "tsx watch src/server.ts",
     "build": "vite build",
+    "build:server": "tsc",
     "start": "node dist/server.js",
     "check:db": "tsx src/scripts/check-db.ts",
     "test": "tsx src/scripts/run-unit-tests.ts"

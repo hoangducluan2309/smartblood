@@ -49,7 +49,7 @@ export function errorMiddleware(
   // 5. Lỗi ràng buộc khóa ngoại (Foreign Key Constraint)
   else if (err instanceof ForeignKeyConstraintError) {
     statusCode = 400;
-    message = 'Dữ liệu tham chiếu khóa ngoại không hợp lệ hoặc không tồn tại.';
+    message = 'Không thể xóa hoặc thay đổi do còn dữ liệu liên kết khác trong hệ thống (lịch hẹn, điều phối, sự kiện...).';
   }
   // 6. Lỗi kết nối CSDL (Connection / Timeout)
   else if (err instanceof ConnectionError) {

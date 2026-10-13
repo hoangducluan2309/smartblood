@@ -10,12 +10,14 @@ async function resetAllPasswords() {
 
   // 1. Cập nhật các tài khoản chính
   const accounts = [
-    { email: 'admin@hienmau.vn', hoTen: 'Quản Trị Viên Hệ Thống', vaiTro: 'ADMIN', soDienThoai: '0901000001' },
-    { email: 'staff.choray@hienmau.vn', hoTen: 'BS. Trần Thị Mai (BV Chợ Rẫy)', vaiTro: 'HOSPITAL_STAFF', soDienThoai: '0902000002' },
-    { email: 'nguyenvanan.donor@gmail.com', hoTen: 'Nguyễn Văn An', vaiTro: 'DONOR', soDienThoai: '0903000003' },
-    { email: 'admin.dispatch@hienmau.vn', hoTen: 'Admin Điều Phối Máu', vaiTro: 'ADMIN', soDienThoai: '0901000009' },
-    { email: 'staff.test@hienmau.vn', hoTen: 'BS. Tiếp Nhận Máu', vaiTro: 'HOSPITAL_STAFF', soDienThoai: '0902000009' },
-    { email: 'test.donor@gmail.com', hoTen: 'Người Hiến Máu Test', vaiTro: 'DONOR', soDienThoai: '0903000009' },
+    { email: 'admin@hienmau.vn', hoTen: 'Quản Trị Viên Hệ Thống', vaiTro: 'ADMIN', soDienThoai: '0901000001', cccd: '001090000001' },
+    { email: 'admin.hn@hienmau.vn', hoTen: 'Quản Trị Viên Hệ Thống HN', vaiTro: 'ADMIN', soDienThoai: '0901001001', cccd: '079001001001' },
+    { email: 'admin.hcm@hienmau.vn', hoTen: 'Lương Văn Long (Admin)', vaiTro: 'ADMIN', soDienThoai: '0909999999', cccd: '079079079079' },
+    { email: 'staff.choray@hienmau.vn', hoTen: 'BS. Trần Thị Mai (BV Chợ Rẫy)', vaiTro: 'HOSPITAL_STAFF', soDienThoai: '0902000002', cccd: '001090000002' },
+    { email: 'staff@hienmau.vn', hoTen: 'BS. Nguyễn Văn B', vaiTro: 'HOSPITAL_STAFF', soDienThoai: '0912345678', cccd: '079090005555' },
+    { email: 'nguyenvanan.donor@gmail.com', hoTen: 'Nguyễn Văn An', vaiTro: 'DONOR', soDienThoai: '0903000003', cccd: '001090000003' },
+    { email: 'test.donor@gmail.com', hoTen: 'Người Hiến Máu Test', vaiTro: 'DONOR', soDienThoai: '0987654321', cccd: '001090000004' },
+    { email: 'luongvanlong91@gmail.com', hoTen: 'Lương Văn Long', vaiTro: 'DONOR', soDienThoai: '0937944074', cccd: '075091003630' },
   ];
 
   for (const acc of accounts) {
@@ -31,10 +33,11 @@ async function resetAllPasswords() {
         email: acc.email,
         matKhauHash: newHash,
         soDienThoai: acc.soDienThoai,
+        cccd: acc.cccd,
         vaiTro: acc.vaiTro as any,
         trangThai: 'HoatDong',
-        nhomMau: 'O',
-        yeuToRh: '+'
+        nhomMau: 'O+',
+        yeuToRh: 'Duong'
       });
       console.log(`[TẠO MỚI] Đã tạo tài khoản: ${acc.email} với mật khẩu "Password@123"`);
     }

@@ -18,20 +18,61 @@ servers:
     description: Máy chủ phát triển cục bộ (Local Development Server)
 
 tags:
+  - name: System
+    description: Kiểm tra tình trạng hoạt động của hệ thống
   - name: Auth
     description: Quản lý xác thực và phân quyền người dùng
+  - name: Users
+    description: Quản lý danh sách tài khoản người dùng (Chỉ Quản trị viên)
   - name: Donation Events
     description: Quản lý các chiến dịch, ngày hội hiến máu tình nguyện
   - name: Donation Appointments
     description: Đăng ký lịch hẹn hiến máu và cập nhật kết quả hiến
   - name: Blood Inventories
-    description: Tra cứu dữ liệu tồn kho máu theo nguyên tắc FEFO
+    description: Tra cứu dữ liệu tồn kho máu theo nguyên tắc FEFO và quản lý kho
   - name: Emergency Requests
     description: Tiếp nhận và điều phối xuất kho các đơn cấp cứu máu khẩn cấp
   - name: Forecasts
     description: Phân tích dự báo nguy cơ thiếu hụt và tìm kiếm người hiến khẩn cấp
 
 paths:
+  # ============================================================================
+  # 0. SYSTEM HEALTH
+  # ============================================================================
+  /api/health:
+    get:
+      tags:
+        - System
+      summary: Kiểm tra tình trạng hoạt động của máy chủ (Health Check)
+      description: Kiểm tra máy chủ Backend và dịch vụ kết nối cơ sở dữ liệu.
+      responses:
+        '200':
+          description: Hệ thống hoạt động bình thường
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Hệ thống Backend đang hoạt động ổn định.
+                  data:
+                    type: object
+                    properties:
+                      service:
+                        type: string
+                        example: Blood Donation Coordination & Emergency Prediction API
+                      status:
+                        type: string
+                        example: UP
+                      timestamp:
+                        type: string
+                        format: date-time
+                        example: '2026-10-14T00:00:00.000Z'
+
   # ============================================================================
   # 1. AUTHENTICATION & AUTHORIZATION
   # ============================================================================
@@ -66,7 +107,7 @@ paths:
       tags:
         - Auth
       summary: Đăng nhập hệ thống nhận JWT Access Token
-      description: Xác thực email, mật khẩu và trả về Access Token (thời hạn 1 ngày).
+      description: Xác thực email / số điện thoại / CCCD, mật khẩu và trả về Access Token (thời hạn 1 ngày).
       requestBody:
         required: true
         content:
@@ -105,8 +146,290 @@ paths:
           $ref: '#/components/responses/UnauthorizedError'
 
   # ============================================================================
-  # 2. DONATION EVENTS
+  # 1B. USER MANAGEMENT (Chỉ Quản trị viên - ADMIN)
   # ============================================================================
+  /api/v1/users:
+    get:
+      tags:
+        - Users
+      summary: Xem danh sách tài khoản người dùng (Chỉ Admin)
+      description: Hỗ trợ tìm kiếm theo họ tên/email/sđt/cccd, lọc theo vai trò, trạng thái, nhóm máu và phân trang.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Trang hiện tại (mặc định 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Số lượng mỗi trang (mặc định 10)
+          required: false
+          schema:
+            type: integer
+            default: 10
+        - name: search
+          in: query
+          description: Từ khóa tìm kiếm (họ tên, email, số điện thoại, CCCD)
+          required: false
+          schema:
+            type: string
+        - name: vaiTro
+          in: query
+          description: Lọc theo vai trò người dùng
+          required: false
+          schema:
+            type: string
+            enum: ['ALL', 'ADMIN', 'HOSPITAL_STAFF', 'DONOR']
+        - name: trangThai
+          in: query
+          description: Lọc theo trạng thái tài khoản
+          required: false
+          schema:
+            type: string
+            enum: ['ALL', 'HoatDong', 'Khoa']
+        - name: nhomMau
+          in: query
+          description: Lọc theo nhóm máu
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lấy danh sách người dùng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy danh sách người dùng thành công.
+                  data:
+                    $ref: '#/components/schemas/PaginatedUserResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      tags:
+        - Users
+      summary: Tạo tài khoản người dùng mới (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserDTO'
+      responses:
+        '201':
+          description: Tạo tài khoản thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Tạo tài khoản người dùng mới thành công.
+                  data:
+                    $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /api/v1/users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Xem chi tiết thông tin người dùng theo ID (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID người dùng cần xem
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Lấy thông tin người dùng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy thông tin người dùng thành công.
+                  data:
+                    $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    put:
+      tags:
+        - Users
+      summary: Cập nhật thông tin tài khoản người dùng (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID người dùng cần cập nhật
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserDTO'
+      responses:
+        '200':
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cập nhật tài khoản người dùng thành công.
+                  data:
+                    $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      tags:
+        - Users
+      summary: Xóa vĩnh viễn tài khoản người dùng (Chỉ Admin)
+      description: Tự động chuyển quyền sở hữu các đơn yêu cầu, sự kiện sang Admin đang thao tác trước khi xóa an toàn.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID người dùng cần xóa
+          schema:
+            type: integer
+            example: 2
+      responses:
+        '200':
+          description: Xóa người dùng thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã xóa vĩnh viễn tài khoản [Nguyễn Văn A] thành công.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 2
+                      message:
+                        type: string
+                        example: Đã xóa vĩnh viễn tài khoản [Nguyễn Văn A] thành công.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/users/{id}/status:
+    put:
+      tags:
+        - Users
+      summary: Khóa / Mở khóa nhanh tài khoản (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID người dùng cần đổi trạng thái
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Đổi trạng thái thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã đổi trạng thái tài khoản thành Khoa.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      trangThai:
+                        type: string
+                        example: Khoa
+                      message:
+                        type: string
+                        example: Đã đổi trạng thái tài khoản thành Khoa.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
   # ============================================================================
   # 2. DONATION EVENTS
   # ============================================================================
@@ -208,9 +531,172 @@ paths:
         '403':
           $ref: '#/components/responses/ForbiddenError'
 
+  /api/v1/donation-events/{id}:
+    put:
+      tags:
+        - Donation Events
+      summary: Cập nhật thông tin sự kiện hiến máu (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID sự kiện cần cập nhật
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSuKienDTO'
+      responses:
+        '200':
+          description: Cập nhật thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cập nhật sự kiện hiến máu thành công.
+                  data:
+                    $ref: '#/components/schemas/SuKienHienMau'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      tags:
+        - Donation Events
+      summary: Xóa sự kiện hiến máu (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID sự kiện cần xóa
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Xóa sự kiện thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã xóa sự kiện hiến máu thành công.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      message:
+                        type: string
+                        example: Đã xóa sự kiện hiến máu thành công.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/donation-events/{id}/status:
+    put:
+      tags:
+        - Donation Events
+      summary: Đổi trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc - Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID sự kiện cần cập nhật trạng thái
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSuKienStatusDTO'
+      responses:
+        '200':
+          description: Đổi trạng thái thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cập nhật trạng thái sự kiện thành công.
+                  data:
+                    $ref: '#/components/schemas/SuKienHienMau'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
   # ============================================================================
   # 3. DONATION APPOINTMENTS
   # ============================================================================
+  /api/v1/donation-appointments/my-history:
+    get:
+      tags:
+        - Donation Appointments
+      summary: Xem lịch sử hiến máu của chính mình (Chỉ Tình nguyện viên - DONOR)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lấy lịch sử hiến máu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy lịch sử hiến máu thành công.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MyDonationHistoryItem'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
   /api/v1/donation-appointments:
     get:
       tags:
@@ -304,6 +790,51 @@ paths:
                 message: Chưa đủ khoảng cách tối thiểu 84 ngày kể từ lần hiến máu trước (Lần gần nhất 15/10/2026, cách 17 ngày).
                 data: null
 
+  /api/v1/donation-appointments/{id}:
+    delete:
+      tags:
+        - Donation Appointments
+      summary: Hủy / Xóa lịch hẹn hiến máu (Donor / Staff / Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID lịch hẹn cần hủy
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Hủy lịch hẹn thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Hủy lịch hẹn thành công.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      message:
+                        type: string
+                        example: Hủy lịch hẹn thành công.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
   /api/v1/donation-appointments/{id}/status:
     put:
       tags:
@@ -344,8 +875,33 @@ paths:
                     $ref: '#/components/schemas/LichHenHienMau'
 
   # ============================================================================
-  # 4. BLOOD INVENTORIES
+  # 4. BLOOD INVENTORIES & MANAGEMENT
   # ============================================================================
+  /api/v1/blood-inventories/summary:
+    get:
+      tags:
+        - Blood Inventories
+      summary: Thống kê tổng hợp trữ lượng 8 nhóm máu (Summary)
+      description: Tính toán số lượng túi máu, mức độ an toàn (SAFE, WARNING, CRITICAL) và số túi sắp hết hạn cho 8 nhóm máu.
+      responses:
+        '200':
+          description: Lấy dữ liệu tổng hợp thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy dữ liệu tổng hợp tồn kho máu thành công.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BloodGroupSummaryItem'
+
   /api/v1/blood-inventories:
     get:
       tags:
@@ -402,10 +958,158 @@ paths:
                     example: Lấy dữ liệu tồn kho máu thành công (sắp xếp FEFO).
                   data:
                     $ref: '#/components/schemas/PaginatedKhoMauResponse'
+    post:
+      tags:
+        - Blood Inventories
+      summary: Thêm mới hoặc cộng thêm túi máu vào kho (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBloodInventoryDTO'
+      responses:
+        '201':
+          description: Thêm túi máu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Thêm túi máu vào kho thành công.
+                  data:
+                    $ref: '#/components/schemas/KhoMauWithWarning'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /api/v1/blood-inventories/{id}:
+    put:
+      tags:
+        - Blood Inventories
+      summary: Cập nhật thể tích hoặc thông tin lưu trữ túi máu (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID túi máu cần cập nhật
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBloodInventoryDTO'
+      responses:
+        '200':
+          description: Cập nhật túi máu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cập nhật thông tin túi máu thành công.
+                  data:
+                    $ref: '#/components/schemas/KhoMauWithWarning'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      tags:
+        - Blood Inventories
+      summary: Xuất hủy / Xóa túi máu khỏi kho (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID túi máu cần xóa
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Xóa túi máu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Xuất hủy / xóa túi máu thành công.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      message:
+                        type: string
+                        example: Đã xuất hủy / xóa lô túi máu khỏi kho thành công.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
 
   # ============================================================================
   # 5. EMERGENCY REQUESTS & DISPATCH
   # ============================================================================
+  /api/v1/emergency-requests/public:
+    get:
+      tags:
+        - Emergency Requests
+      summary: Xem danh sách ca cấp cứu công khai (Public / Không cần đăng nhập)
+      description: Dành cho Trang chủ và Trang cấp cứu để cộng đồng tình nguyện viên theo dõi các ca cấp cứu đang chờ.
+      responses:
+        '200':
+          description: Lấy danh sách ca cấp cứu công khai thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy danh sách ca cấp cứu công khai thành công.
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/YeuCauMauKhanCap'
+
   /api/v1/emergency-requests:
     get:
       tags:
@@ -502,6 +1206,133 @@ paths:
                     example: Tạo yêu cầu máu khẩn cấp thành công.
                   data:
                     $ref: '#/components/schemas/YeuCauMauKhanCap'
+
+  /api/v1/emergency-requests/{id}:
+    delete:
+      tags:
+        - Emergency Requests
+      summary: Xóa vĩnh viễn yêu cầu cấp cứu (Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID ca cấp cứu cần xóa
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Xóa yêu cầu cấp cứu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã xóa yêu cầu cấp cứu thành công.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      message:
+                        type: string
+                        example: Đã xóa yêu cầu cấp cứu thành công.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/emergency-requests/{id}/dismiss:
+    put:
+      tags:
+        - Emergency Requests
+      summary: Tắt / Bỏ qua thẻ cấp cứu (Bác sĩ & Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID ca cấp cứu cần tắt
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DismissEmergencyDTO'
+      responses:
+        '200':
+          description: Tắt thẻ cấp cứu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã tắt thẻ cấp cứu thành công.
+                  data:
+                    $ref: '#/components/schemas/YeuCauMauKhanCap'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/emergency-requests/{id}/restore:
+    put:
+      tags:
+        - Emergency Requests
+      summary: Khôi phục và mở lại thẻ cấp cứu (Bác sĩ & Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID ca cấp cứu cần khôi phục
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Khôi phục thẻ cấp cứu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã khôi phục thẻ cấp cứu thành công.
+                  data:
+                    $ref: '#/components/schemas/YeuCauMauKhanCap'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
 
   /api/v1/emergency-requests/{id}/dispatch:
     post:
@@ -1332,4 +2163,295 @@ components:
             $ref: '#/components/schemas/YeuCauMauKhanCap'
         pagination:
           $ref: '#/components/schemas/PaginationMeta'
+
+    # --- User Management Schemas ---
+    CreateUserDTO:
+      type: object
+      required:
+        - hoTen
+        - email
+        - matKhau
+        - soDienThoai
+      properties:
+        hoTen:
+          type: string
+          example: Trần Thị Mai
+        email:
+          type: string
+          format: email
+          example: mai.tran@gmail.com
+        matKhau:
+          type: string
+          format: password
+          minLength: 6
+          example: Password@123
+        soDienThoai:
+          type: string
+          example: '0912345678'
+        cccd:
+          type: string
+          example: '079199000123'
+        vaiTro:
+          type: string
+          enum: ['ADMIN', 'HOSPITAL_STAFF', 'DONOR']
+          default: 'DONOR'
+          example: 'HOSPITAL_STAFF'
+        nhomMau:
+          type: string
+          example: 'B+'
+        yeuToRh:
+          type: string
+          enum: ['Rh+', 'Rh-']
+          example: 'Rh+'
+        diaChi:
+          type: string
+          example: Quận 5, TP.HCM
+        trangThai:
+          type: string
+          enum: ['HoatDong', 'Khoa']
+          default: 'HoatDong'
+          example: 'HoatDong'
+
+    UpdateUserDTO:
+      type: object
+      properties:
+        hoTen:
+          type: string
+          example: Trần Thị Mai
+        email:
+          type: string
+          format: email
+          example: mai.tran@gmail.com
+        matKhau:
+          type: string
+          format: password
+          minLength: 6
+          example: NewPassword@123
+        soDienThoai:
+          type: string
+          example: '0912345678'
+        cccd:
+          type: string
+          example: '079199000123'
+        vaiTro:
+          type: string
+          enum: ['ADMIN', 'HOSPITAL_STAFF', 'DONOR']
+          example: 'ADMIN'
+        nhomMau:
+          type: string
+          example: 'B+'
+        yeuToRh:
+          type: string
+          enum: ['Rh+', 'Rh-']
+          example: 'Rh+'
+        diaChi:
+          type: string
+          example: Quận 1, TP.HCM
+        trangThai:
+          type: string
+          enum: ['HoatDong', 'Khoa']
+          example: 'HoatDong'
+
+    PaginatedUserResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserResponse'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    # --- Extra Donation Schemas ---
+    UpdateSuKienDTO:
+      type: object
+      properties:
+        tenSuKien:
+          type: string
+          example: Ngày Hội Giọt Hồng Tình Nguyện 2026
+        moTa:
+          type: string
+          example: Cập nhật địa điểm và thời gian mới.
+        diaDiem:
+          type: string
+          example: Trung Tâm Hội Chợ Triển Lãm, Quận 7, TP.HCM
+        thoiGianBatDau:
+          type: string
+          format: date-time
+          example: '2026-10-20T08:00:00.000Z'
+        thoiGianKetThuc:
+          type: string
+          format: date-time
+          example: '2026-10-20T17:00:00.000Z'
+        soLuongDuKien:
+          type: integer
+          example: 300
+        trangThai:
+          type: string
+          enum: ['SapDienRa', 'DangDienRa', 'KetThuc', 'DaHuy']
+          example: 'DangDienRa'
+
+    UpdateSuKienStatusDTO:
+      type: object
+      required:
+        - trangThai
+      properties:
+        trangThai:
+          type: string
+          enum: ['SapDienRa', 'DangDienRa', 'KetThuc', 'DaHuy']
+          example: 'DaHuy'
+        lyDo:
+          type: string
+          example: Tạm hoãn do thời tiết mưa bão
+
+    MyDonationHistoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+          example: DON-2026-001
+        rawId:
+          type: integer
+          example: 1
+        eventId:
+          type: integer
+          example: 1
+        tenSuKien:
+          type: string
+          example: Ngày Hội Giọt Hồng Tình Nguyện 2026
+        diaDiem:
+          type: string
+          example: Nhà Văn Hóa Thanh Niên, Quận 1, TP.HCM
+        thoiGianHen:
+          type: string
+          example: 15/10/2026 08:00 - 09:30
+        ngayHen:
+          type: string
+          example: 15/10/2026
+        khungGio:
+          type: string
+          example: 08:00 - 09:30
+        luongMau:
+          type: string
+          example: 350ml
+        luongMauHienMl:
+          type: integer
+          example: 350
+        nhomMau:
+          type: string
+          example: 'O+'
+        trangThai:
+          type: string
+          enum: ['CHO_TIEP_NHAN', 'DA_TIEP_NHAN', 'HOAN_THANH', 'DA_HUY']
+          example: 'HOAN_THANH'
+        trangThaiGoc:
+          type: string
+          example: 'HoanThanh'
+        maQR:
+          type: string
+          example: QR-DON-2026-1
+        soChungNhan:
+          type: string
+          example: GCN-2026-00001
+        tinhTrangSucKhoe:
+          type: string
+          example: Bình thường
+        ghiChu:
+          type: string
+          example: Đã lấy 350ml máu an toàn
+        createdAt:
+          type: string
+          example: 11/10/2026
+
+    # --- Extra Inventory Schemas ---
+    CreateBloodInventoryDTO:
+      type: object
+      required:
+        - nhomMau
+        - donViLuuTru
+        - soLuongConLaiMl
+      properties:
+        nhomMau:
+          type: string
+          enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+          example: 'O+'
+        thanhPhan:
+          type: string
+          enum: ['ToanPhan', 'HongCau', 'TieuCau', 'HuyetTuong']
+          default: 'ToanPhan'
+          example: 'ToanPhan'
+        soLuongConLaiMl:
+          type: integer
+          example: 1050
+        nguongCanhBaoMl:
+          type: integer
+          default: 500
+          example: 500
+        donViLuuTru:
+          type: string
+          example: Kho Lưu Trữ Trung Tâm - TP.HCM
+
+    UpdateBloodInventoryDTO:
+      type: object
+      properties:
+        soLuongConLaiMl:
+          type: integer
+          example: 1400
+        nguongCanhBaoMl:
+          type: integer
+          example: 600
+        donViLuuTru:
+          type: string
+          example: Kho Lưu Trữ Bệnh Viện Chợ Rẫy
+        thanhPhan:
+          type: string
+          enum: ['ToanPhan', 'HongCau', 'TieuCau', 'HuyetTuong']
+          example: 'HongCau'
+
+    BloodGroupSummaryItem:
+      type: object
+      properties:
+        nhomMau:
+          type: string
+          example: 'O+'
+        bloodGroup:
+          type: string
+          example: 'O+'
+        soLuongTui:
+          type: integer
+          example: 14
+        unitsAvailable:
+          type: integer
+          example: 14
+        soLuongMl:
+          type: integer
+          example: 4900
+        nguongAnToan:
+          type: integer
+          example: 10
+        safeThreshold:
+          type: integer
+          example: 10
+        phanTram:
+          type: integer
+          example: 100
+        mucDo:
+          type: string
+          enum: ['SAFE', 'WARNING', 'CRITICAL']
+          example: 'SAFE'
+        status:
+          type: string
+          enum: ['SAFE', 'WARNING', 'CRITICAL']
+          example: 'SAFE'
+        tuiSapHetHan:
+          type: integer
+          example: 2
+
+    # --- Extra Emergency Request Schemas ---
+    DismissEmergencyDTO:
+      type: object
+      properties:
+        lyDo:
+          type: string
+          example: Bệnh viện đã được chi viện từ ngân hàng máu vệ tinh
 

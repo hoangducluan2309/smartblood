@@ -149,6 +149,80 @@ export class EmergencyController {
       next(error);
     }
   }
+
+  /**
+   * PUT /api/v1/emergency-requests/:id/dismiss
+   * Bác sĩ & Admin: Tắt thẻ cấp cứu / Hủy ca cấp cứu
+   */
+  async dismissRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      if (isNaN(id)) throw AppError.badRequest('ID yêu cầu không hợp lệ.');
+      const result = await emergencyService.tatYeuCauKhanCap(id, req.body?.lyDo);
+      res.status(200).json({
+        success: true,
+        message: 'Đã tắt thẻ cấp cứu thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/v1/emergency-requests/:id/restore
+   * Bác sĩ & Admin: Khôi phục và mở lại thẻ cấp cứu
+   */
+  async restoreRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      if (isNaN(id)) throw AppError.badRequest('ID yêu cầu không hợp lệ.');
+      const result = await emergencyService.khoiPhucYeuCauKhanCap(id);
+      res.status(200).json({
+        success: true,
+        message: 'Đã khôi phục thẻ cấp cứu thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/v1/emergency-requests/:id
+   * Admin: Xóa yêu cầu cấp cứu
+   */
+  async deleteRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      if (isNaN(id)) throw AppError.badRequest('ID yêu cầu không hợp lệ.');
+      const result = await emergencyService.xoaYeuCauKhanCap(id);
+      res.status(200).json({
+        success: true,
+        message: 'Đã xóa yêu cầu cấp cứu thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/emergency-requests/public
+   * Khách vãng lai & Tình nguyện viên: Xem danh sách ca cấp cứu đang chờ
+   */
+  async getPublicRequests(_req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await emergencyService.layDanhSachYeuCauKhanCapCongKhai();
+      res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách ca cấp cứu công khai thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const emergencyController = new EmergencyController();

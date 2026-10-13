@@ -299,6 +299,172 @@ export class DonationService {
       return appointment;
     });
   }
+
+  /**
+   * 5. Cập nhật sự kiện hiến máu (Admin)
+   */
+  async capNhatSuKien(id: number, data: Partial<CreateSuKienDTO>) {
+    const suKien = await SuKienHienMau.findByPk(id);
+    if (!suKien) {
+      throw AppError.notFound('Sự kiện hiến máu không tồn tại.');
+    }
+
+    if (data.tenSuKien) suKien.tenSuKien = data.tenSuKien.trim();
+    if (data.moTa !== undefined) suKien.moTa = data.moTa ? data.moTa.trim() : null;
+    if (data.diaDiem) suKien.diaDiem = data.diaDiem.trim();
+    if (data.thoiGianBatDau) suKien.thoiGianBatDau = new Date(data.thoiGianBatDau);
+    if (data.thoiGianKetThuc) suKien.thoiGianKetThuc = new Date(data.thoiGianKetThuc);
+    if (data.soLuongDuKien !== undefined) suKien.soLuongDuKien = Number(data.soLuongDuKien);
+    if (data.trangThai) {
+      if (!['SapDienRa', 'DangDienRa', 'KetThuc', 'DaHuy'].includes(data.trangThai)) {
+        throw AppError.badRequest(`Trạng thái sự kiện không hợp lệ: ${data.trangThai}`);
+      }
+      suKien.trangThai = data.trangThai;
+    }
+
+    await suKien.save();
+    return suKien;
+  }
+
+  /**
+   * 5b. Đổi trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc) - Dành cho Admin
+   */
+  async doiTrangThaiSuKien(id: number, trangThai: any, lyDo?: string) {
+    const suKien = await SuKienHienMau.findByPk(id);
+    if (!suKien) {
+      throw AppError.notFound('Sự kiện hiến máu không tồn tại.');
+    }
+
+    if (!['SapDienRa', 'DangDienRa', 'KetThuc', 'DaHuy'].includes(trangThai)) {
+      throw AppError.badRequest(`Trạng thái sự kiện không hợp lệ: ${trangThai}`);
+    }
+
+    suKien.trangThai = trangThai;
+    if (lyDo && lyDo.trim()) {
+      const cleanReason = lyDo.trim();
+      if (!suKien.moTa?.includes(cleanReason)) {
+        suKien.moTa = suKien.moTa ? `${suKien.moTa} [${cleanReason}]` : cleanReason;
+      }
+    }
+
+    await suKien.save();
+    return suKien;
+  }
+
+  /**
+   * 6. Xóa sự kiện hiến máu (Admin)
+   */
+  async xoaSuKien(id: number) {
+    const suKien = await SuKienHienMau.findByPk(id);
+    if (!suKien) {
+      throw AppError.notFound('Sự kiện hiến máu không tồn tại.');
+    }
+
+    // Xóa liên kết lịch hẹn hoặc cập nhật suKienId = null
+    await LichHenHienMau.update({ suKienId: null }, { where: { suKienId: id } });
+    await suKien.destroy();
+    return { id, message: 'Đã xóa sự kiện hiến máu thành công.' };
+  }
+
+  /**
+   * 7. Lấy lịch sử hiến máu của chính người dùng (Donor)
+   */
+  async layLichSuHienMauCuaToi(donorId: number): Promise<any[]> {
+    const donor = await NguoiDung.findByPk(donorId, {
+      attributes: ['id', 'hoTen', 'nhomMau', 'yeuToRh'],
+    });
+
+    const rows = await LichHenHienMau.findAll({
+      where: { nguoiHienId: donorId },
+      include: [
+        {
+          model: SuKienHienMau,
+          as: 'suKien',
+          attributes: ['id', 'tenSuKien', 'diaDiem', 'thoiGianBatDau'],
+        },
+      ],
+      order: [['ngayHen', 'DESC']],
+    });
+
+    return rows.map((item) => {
+      let statusFrontend: 'CHO_TIEP_NHAN' | 'DA_TIEP_NHAN' | 'HOAN_THANH' | 'DA_HUY' = 'CHO_TIEP_NHAN';
+      if (item.trangThai === 'HoanThanh') statusFrontend = 'HOAN_THANH';
+      else if (item.trangThai === 'DaXacNhan') statusFrontend = 'DA_TIEP_NHAN';
+      else if (item.trangThai === 'DaHuy' || item.trangThai === 'KhongDen') statusFrontend = 'DA_HUY';
+      else statusFrontend = 'CHO_TIEP_NHAN';
+
+      const appointmentDate = new Date(item.ngayHen);
+      const formattedDate = appointmentDate.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      });
+      const year = appointmentDate.getFullYear();
+
+      // Chiết xuất địa điểm từ sự kiện hoặc ghi chú
+      let location = item.suKien?.diaDiem;
+      if (!location && item.ghiChu) {
+        if (item.ghiChu.includes('Địa điểm:')) {
+          location = item.ghiChu.split('Địa điểm:')[1]?.split('.')[0]?.trim();
+        } else if (item.ghiChu.includes('Điểm hiến:')) {
+          location = item.ghiChu.split('Điểm hiến:')[1]?.split('.')[0]?.trim();
+        }
+      }
+      if (!location) {
+        location = 'Bệnh viện Chợ Rẫy (Trung Tâm Truyền Máu)';
+      }
+
+      let certificateNumber: string | undefined = undefined;
+      if (item.ghiChu && item.ghiChu.includes('Giấy chứng nhận số:')) {
+        certificateNumber = item.ghiChu.split('Giấy chứng nhận số:')[1]?.split('.')[0]?.trim();
+      }
+      if (!certificateNumber && item.trangThai === 'HoanThanh') {
+        certificateNumber = `GCN-${year}-${String(item.id).padStart(5, '0')}`;
+      }
+
+      return {
+        id: `DON-${year}-${String(item.id).padStart(3, '0')}`,
+        rawId: item.id,
+        eventId: item.suKienId || 0,
+        tenSuKien: item.suKien?.tenSuKien || 'Hiến Máu Tình Nguyện Định Kỳ',
+        diaDiem: location,
+        diaChi: location,
+        thoiGianHen: `${formattedDate} ${item.khungGio}`,
+        ngayHen: formattedDate,
+        khungGio: item.khungGio,
+        luongMau: `${item.luongMauHienMl || 350}ml`,
+        luongMauHienMl: item.luongMauHienMl || 350,
+        nhomMau: donor?.nhomMau || 'O+',
+        trangThai: statusFrontend,
+        trangThaiGoc: item.trangThai,
+        maQR: `QR-DON-${year}-${item.id}`,
+        soChungNhan: certificateNumber,
+        tinhTrangSucKhoe: item.tinhTrangSucKhoe,
+        ghiChu: item.ghiChu,
+        createdAt: item.ngayTao ? new Date(item.ngayTao).toLocaleDateString('vi-VN') : '',
+      };
+    });
+  }
+
+  /**
+   * 8. Hủy / Xóa lịch hẹn hiến máu
+   */
+  async xoaLichHen(lichHenId: number, currentUserId: number, currentUserRole: string) {
+    const appointment = await LichHenHienMau.findByPk(lichHenId);
+    if (!appointment) {
+      throw AppError.notFound('Lịch hẹn hiến máu không tồn tại.');
+    }
+
+    // Kiểm tra quyền: Người tạo (Donor) hoặc Admin / Hospital Staff
+    if (currentUserRole === 'DONOR' && appointment.nguoiHienId !== currentUserId) {
+      throw AppError.forbidden('Bạn không có quyền thao tác trên lịch hẹn của người khác.');
+    }
+
+    // Đánh dấu hủy
+    appointment.trangThai = 'DaHuy';
+    await appointment.save();
+    return { id: lichHenId, message: 'Đã hủy lịch hẹn hiến máu thành công.' };
+  }
 }
 
 export const donationService = new DonationService();
