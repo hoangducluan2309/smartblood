@@ -142,7 +142,64 @@ export class EmergencyController {
       const result = await emergencyService.dieuPhoiXuatKho(yeuCauId, req.user.id, req.body);
       res.status(200).json({
         success: true,
-        message: 'Điều phối xuất kho và tạo lệnh vận chuyển thành công.',
+        message: 'Điều phối xuất kho và tạo lệnh vận chuyển xe 115 thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/emergency-requests/direct-dispatch
+   * Admin: Điều phối xuất kho và tạo xe cứu trợ trực tiếp
+   */
+  async directDispatch(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) throw AppError.unauthorized();
+      const result = await emergencyService.dieuPhoiTrucTiep(req.user.id, req.body);
+      res.status(201).json({
+        success: true,
+        message: 'Xuất kho và tạo lệnh điều phối xe cứu trợ trực tiếp thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/emergency-requests/dispatches
+   * Admin & Hospital Staff: Lấy danh sách lịch sử các chuyến xe điều phối đã xuất kho
+   */
+  async getDispatches(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await emergencyService.layDanhSachDieuPhoi(req.query);
+      res.status(200).json({
+        success: true,
+        message: 'Lấy danh sách các chuyến xe điều phối thành công.',
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PATCH /api/v1/emergency-requests/dispatches/:id/status
+   * Admin & Hospital Staff: Cập nhật trạng thái chuyến xe (Đang giao -> Đã nhận)
+   */
+  async updateDispatchStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      if (isNaN(id)) throw AppError.badRequest('ID lệnh điều phối không hợp lệ.');
+      const { trangThaiVanChuyen, ghiChu } = req.body;
+      if (!trangThaiVanChuyen) throw AppError.badRequest('Vui lòng cung cấp trạng thái vận chuyển.');
+
+      const result = await emergencyService.capNhatTrangThaiVanChuyen(id, trangThaiVanChuyen, ghiChu);
+      res.status(200).json({
+        success: true,
+        message: 'Cập nhật trạng thái vận chuyển thành công.',
         data: result,
       });
     } catch (error) {

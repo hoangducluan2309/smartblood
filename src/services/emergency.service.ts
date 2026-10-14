@@ -6,12 +6,14 @@ import { AppError } from '../utils/AppError.js';
 import type {
   CreateEmergencyRequestDTO,
   DispatchEmergencyRequestDTO,
+  DirectDispatchDTO,
   MucDoKhanCapInput,
   BloodInventoryQueryDTO,
   EmergencyRequestQueryDTO,
 } from '../dtos/emergency.dto.js';
 import type { MucDoKhanCap } from '../models/YeuCauMauKhanCap.js';
-import { parsePaginationParams, buildPaginatedResponse } from '../dtos/pagination.dto.js';
+import type { TrangThaiVanChuyen } from '../models/DieuPhoiMau.js';
+import { parsePaginationParams, buildPaginatedResponse, type PaginationQuery } from '../dtos/pagination.dto.js';
 
 export class EmergencyService {
   /**
@@ -157,7 +159,7 @@ export class EmergencyService {
   }
 
   /**
-   * 3. Điều phối xuất kho theo FEFO và kiểm tra ma trận tương thích nhóm máu
+   * 3. Điều phối xuất kho theo FEFO hoặc theo nhóm máu / lô kho máu được chỉ định
    */
   async dieuPhoiXuatKho(yeuCauId: number, nguoiDieuPhoiId: number, dispatchData: DispatchEmergencyRequestDTO) {
     // THỰC THI TRANSACTION ĐỂ ĐẢM BẢO TOÀN VẸN DỮ LIỆU
@@ -190,13 +192,34 @@ export class EmergencyService {
       // 2. Tra cứu danh sách nhóm máu tương thích theo ma trận y khoa
       const compatibleBloodTypes = getCompatibleDonorBloodTypes(yeuCau.nhomMauCan, yeuCau.thanhPhanCan);
 
-      // 3. Tìm các túi máu có sẵn trong kho theo FEFO
+      // Nếu người điều phối chọn xuất nhóm máu cụ thể
+      let targetBloodTypes = compatibleBloodTypes;
+      if (dispatchData.nhomMauXuat) {
+        const chosenGroup = dispatchData.nhomMauXuat.trim().toUpperCase();
+        if (!compatibleBloodTypes.includes(chosenGroup)) {
+          throw AppError.badRequest(
+            `Nhóm máu xuất [${chosenGroup}] không tương thích y khoa với nhóm máu cần [${yeuCau.nhomMauCan}] (${yeuCau.thanhPhanCan}). Nhóm máu tương thích hợp lệ: ${compatibleBloodTypes.join(', ')}`
+          );
+        }
+        targetBloodTypes = [chosenGroup];
+      }
+
+      // 3. Xây dựng điều kiện truy vấn kho máu
+      const inventoryWhere: Record<string, unknown> = {
+        nhomMau: { [Op.in]: targetBloodTypes },
+        thanhPhan: yeuCau.thanhPhanCan,
+        soLuongConLaiMl: { [Op.gt]: 0 },
+      };
+
+      if (dispatchData.khoMauId) {
+        inventoryWhere.id = dispatchData.khoMauId;
+      } else if (dispatchData.khoMauIds && dispatchData.khoMauIds.length > 0) {
+        inventoryWhere.id = { [Op.in]: dispatchData.khoMauIds };
+      }
+
+      // Tìm các túi máu có sẵn trong kho theo FEFO
       const availableInventories = await KhoMau.findAll({
-        where: {
-          nhomMau: { [Op.in]: compatibleBloodTypes },
-          thanhPhan: yeuCau.thanhPhanCan,
-          soLuongConLaiMl: { [Op.gt]: 0 },
-        },
+        where: inventoryWhere,
         order: [['ngayCapNhat', 'ASC']], // FEFO: Ngày lưu trữ/cập nhật cũ nhất xuất trước
         transaction: t,
         lock: t.LOCK.UPDATE,
@@ -205,17 +228,32 @@ export class EmergencyService {
       // 4. Tính tổng lượng máu tương thích hiện có trong kho
       const totalAvailableMl = availableInventories.reduce((sum, item) => sum + item.soLuongConLaiMl, 0);
 
-      // 5. NẾU KHÔNG ĐỦ SỐ LƯỢNG MÁU TƯƠNG THÍCH -> BÁO LỖI VÀ TRẢ VỀ SỐ LƯỢNG CÒN THIẾU
-      if (totalAvailableMl < yeuCau.soLuongCanMl) {
-        const missingMl = yeuCau.soLuongCanMl - totalAvailableMl;
+      // Tính thể tích cần xuất theo lựa chọn của người điều phối
+      let requiredMl = yeuCau.soLuongCanMl;
+      if (dispatchData.soLuongXuatMl && Number(dispatchData.soLuongXuatMl) > 0) {
+        requiredMl = Number(dispatchData.soLuongXuatMl);
+      } else if (dispatchData.soLuongTui && Number(dispatchData.soLuongTui) > 0) {
+        requiredMl = Number(dispatchData.soLuongTui) * 350;
+      }
+
+      if (totalAvailableMl < requiredMl) {
+        const missingMl = requiredMl - totalAvailableMl;
         throw AppError.badRequest(
-          `Kho không đủ số lượng máu tương thích cho nhóm ${yeuCau.nhomMauCan}. Cần: ${yeuCau.soLuongCanMl}ml, Hiện có: ${totalAvailableMl}ml, Còn thiếu: ${missingMl}ml.`
+          `Kho không đủ số lượng máu cho nhóm ${yeuCau.nhomMauCan}. Cần xuất: ${requiredMl}ml, Hiện có: ${totalAvailableMl}ml, Còn thiếu: ${missingMl}ml.`
         );
       }
 
-      // 6. ĐỦ MÁU -> TIẾN HÀNH TRỪ KHO THEO FEFO & TẠO PHIẾU ĐIỀU PHỐI
-      let remainingNeeded = yeuCau.soLuongCanMl;
+      // 5. TIẾN HÀNH TRỪ KHO THEO FEFO & TẠO PHIẾU ĐIỀU PHỐI XE 115
+      let remainingNeeded = requiredMl;
       const dispatchRecords: DieuPhoiMau[] = [];
+
+      const vehicleString = dispatchData.bienSoXe
+        ? `${dispatchData.donViVanChuyen || 'Đội Cấp Cứu 115'} [BS: ${dispatchData.bienSoXe}]`
+        : (dispatchData.donViVanChuyen || 'Đội Cứu Trợ Y Tế Khẩn Cấp 115');
+
+      const driverDetails = dispatchData.taiXe
+        ? `Tài xế: ${dispatchData.taiXe}${dispatchData.soDienThoaiTaiXe ? ' (' + dispatchData.soDienThoaiTaiXe + ')' : ''}. `
+        : '';
 
       for (const inv of availableInventories) {
         if (remainingNeeded <= 0) break;
@@ -232,14 +270,15 @@ export class EmergencyService {
             nguoiDieuPhoiId,
             soLuongXuatMl: deductAmount,
             trangThaiVanChuyen: 'DangGiao',
-            donViVanChuyen: dispatchData.donViVanChuyen || 'Đội Cứu Trợ Y Tế Khẩn Cấp',
+            donViVanChuyen: vehicleString,
             thoiGianXuat: new Date(),
             thoiGianNhanDuKien: dispatchData.thoiGianNhanDuKien
               ? new Date(dispatchData.thoiGianNhanDuKien)
               : new Date(Date.now() + 2 * 3600 * 1000), // Mặc định sau 2 tiếng
-            ghiChu:
+            ghiChu: `${driverDetails}${
               dispatchData.ghiChu ||
-              `Xuất ${deductAmount}ml nhóm máu ${inv.nhomMau} (${inv.thanhPhan}) chi viện cho ${yeuCau.benhVienYeuCau}`,
+              `Xuất ${deductAmount}ml nhóm máu ${inv.nhomMau} (${inv.thanhPhan}) chi viện cho ${yeuCau.benhVienYeuCau}`
+            }`.slice(0, 500),
           },
           { transaction: t }
         );
@@ -248,16 +287,172 @@ export class EmergencyService {
         remainingNeeded -= deductAmount;
       }
 
-      // 7. Cập nhật trạng thái yêu cầu sang 'DaDapUng'
-      yeuCau.trangThai = 'DaDapUng';
+      // 6. Cập nhật trạng thái yêu cầu sang 'DaDapUng' hoặc 'DangDieuPhoi'
+      yeuCau.trangThai = (yeuCau.soLuongCanMl <= requiredMl) ? 'DaDapUng' : 'DangDieuPhoi';
       await yeuCau.save({ transaction: t });
 
       return {
         yeuCau,
         danhSachXuatKho: dispatchRecords,
-        tongLuongXuatMl: yeuCau.soLuongCanMl,
+        tongLuongXuatMl: requiredMl,
       };
     });
+  }
+
+  /**
+   * 3b. Tạo lệnh điều phối xe cứu trợ và xuất kho trực tiếp
+   */
+  async dieuPhoiTrucTiep(nguoiDieuPhoiId: number, data: DirectDispatchDTO) {
+    const { benhVienNhan, nhomMau, thanhPhan = 'ToanPhan', khoMauId } = data;
+    if (!benhVienNhan || !nhomMau) {
+      throw AppError.badRequest('Vui lòng cung cấp tên bệnh viện nhận và nhóm máu cần xuất.');
+    }
+
+    let volumeMl = data.soLuongXuatMl;
+    if (!volumeMl && data.soLuongTui && data.soLuongTui > 0) {
+      volumeMl = data.soLuongTui * 350;
+    }
+    if (!volumeMl || volumeMl <= 0) {
+      throw AppError.badRequest('Thể tích máu xuất kho phải lớn hơn 0ml.');
+    }
+
+    return sequelize.transaction(async (t: Transaction) => {
+      // 1. Tạo bản ghi yêu cầu cấp cứu tương ứng
+      const yeuCau = await YeuCauMauKhanCap.create(
+        {
+          benhVienYeuCau: benhVienNhan.trim(),
+          nguoiDaiDienId: nguoiDieuPhoiId,
+          nhomMauCan: nhomMau.trim().toUpperCase(),
+          thanhPhanCan: thanhPhan,
+          soLuongCanMl: volumeMl,
+          mucDoKhanCap: 'NGUY_CAP',
+          lyDo: `Điều phối xuất máu chi viện trực tiếp: ${data.ghiChu || 'Cứu trợ hỏa tốc'}`,
+          hanChot: new Date(Date.now() + 2 * 3600 * 1000),
+          trangThai: 'DaDapUng',
+        },
+        { transaction: t }
+      );
+
+      // 2. Tra cứu kho máu
+      const inventoryWhere: Record<string, unknown> = {
+        nhomMau: nhomMau.trim().toUpperCase(),
+        thanhPhan,
+        soLuongConLaiMl: { [Op.gt]: 0 },
+      };
+      if (khoMauId) {
+        inventoryWhere.id = khoMauId;
+      }
+
+      const availableInventories = await KhoMau.findAll({
+        where: inventoryWhere,
+        order: [['ngayCapNhat', 'ASC']],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+
+      const totalAvailableMl = availableInventories.reduce((sum, item) => sum + item.soLuongConLaiMl, 0);
+      if (totalAvailableMl < volumeMl) {
+        throw AppError.badRequest(
+          `Kho không đủ nhóm máu ${nhomMau} (${thanhPhan}). Cần xuất: ${volumeMl}ml, Hiện có trong kho: ${totalAvailableMl}ml.`
+        );
+      }
+
+      let remainingNeeded = volumeMl;
+      const dispatchRecords: DieuPhoiMau[] = [];
+
+      const vehicleString = data.bienSoXe
+        ? `${data.donViVanChuyen || 'Đội Cấp Cứu 115'} [BS: ${data.bienSoXe}]`
+        : (data.donViVanChuyen || 'Đội Cứu Trợ Y Tế Khẩn Cấp 115');
+
+      const driverDetails = data.taiXe
+        ? `Tài xế: ${data.taiXe}${data.soDienThoaiTaiXe ? ' (' + data.soDienThoaiTaiXe + ')' : ''}. `
+        : '';
+
+      for (const inv of availableInventories) {
+        if (remainingNeeded <= 0) break;
+
+        const deductAmount = Math.min(inv.soLuongConLaiMl, remainingNeeded);
+        inv.soLuongConLaiMl -= deductAmount;
+        await inv.save({ transaction: t });
+
+        const record = await DieuPhoiMau.create(
+          {
+            yeuCauId: yeuCau.id,
+            khoMauId: inv.id,
+            nguoiDieuPhoiId,
+            soLuongXuatMl: deductAmount,
+            trangThaiVanChuyen: 'DangGiao',
+            donViVanChuyen: vehicleString,
+            thoiGianXuat: new Date(),
+            thoiGianNhanDuKien: data.thoiGianNhanDuKien
+              ? new Date(data.thoiGianNhanDuKien)
+              : new Date(Date.now() + 2 * 3600 * 1000),
+            ghiChu: `${driverDetails}${data.ghiChu || `Xuất ${deductAmount}ml nhóm ${inv.nhomMau} (${inv.thanhPhan}) cho ${benhVienNhan}`}`.slice(0, 500),
+          },
+          { transaction: t }
+        );
+
+        dispatchRecords.push(record);
+        remainingNeeded -= deductAmount;
+      }
+
+      return {
+        yeuCau,
+        danhSachXuatKho: dispatchRecords,
+        tongLuongXuatMl: volumeMl,
+      };
+    });
+  }
+
+  /**
+   * 3c. Xem danh sách các chuyến xe điều phối đã xuất kho
+   */
+  async layDanhSachDieuPhoi(query: PaginationQuery = {}) {
+    const { page, limit, offset } = parsePaginationParams(query);
+    const { count, rows } = await DieuPhoiMau.findAndCountAll({
+      include: [
+        {
+          model: YeuCauMauKhanCap,
+          as: 'yeuCau',
+          attributes: ['id', 'benhVienYeuCau', 'nhomMauCan', 'thanhPhanCan', 'mucDoKhanCap', 'lyDo', 'trangThai'],
+        },
+        {
+          model: KhoMau,
+          as: 'khoMau',
+          attributes: ['id', 'nhomMau', 'thanhPhan', 'donViLuuTru'],
+        },
+        {
+          model: NguoiDung,
+          as: 'nguoiDieuPhoi',
+          attributes: ['id', 'hoTen', 'email', 'soDienThoai'],
+        },
+      ],
+      order: [['ngayTao', 'DESC']],
+      limit,
+      offset,
+    });
+
+    return buildPaginatedResponse(rows, count, page, limit);
+  }
+
+  /**
+   * 3d. Cập nhật trạng thái vận chuyển của chuyến xe điều phối
+   */
+  async capNhatTrangThaiVanChuyen(id: number, trangThai: TrangThaiVanChuyen, ghiChu?: string) {
+    const record = await DieuPhoiMau.findByPk(id);
+    if (!record) {
+      throw AppError.notFound('Không tìm thấy thông tin chuyến xe điều phối.');
+    }
+
+    record.trangThaiVanChuyen = trangThai;
+    if (trangThai === 'DaNhan') {
+      record.thoiGianNhanThucTe = new Date();
+    }
+    if (ghiChu) {
+      record.ghiChu = `${record.ghiChu ? record.ghiChu + ' | ' : ''}${ghiChu.trim()}`.slice(0, 500);
+    }
+    await record.save();
+    return record;
   }
 
   /**
@@ -451,7 +646,7 @@ export class EmergencyService {
   async layDanhSachYeuCauKhanCapCongKhai() {
     return YeuCauMauKhanCap.findAll({
       where: {
-        trangThai: { [Op.in]: ['DangCho', 'DangDieuPhoi', 'DaHuy'] },
+        trangThai: { [Op.in]: ['DangCho', 'DangDieuPhoi', 'DaHuy', 'DaDapUng'] },
       },
       include: [
         {

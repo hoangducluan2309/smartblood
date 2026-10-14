@@ -479,8 +479,8 @@ export const QrScannerTab: React.FC<QrScannerTabProps> = ({
                 <span className="text-sm font-bold text-slate-800 block">
                   {donorResult.lanHienGanNhat || 'Chưa từng hiến'}
                 </span>
-                {donorResult.diaChiGanNhat && (
-                  <span className="text-[10px] text-slate-400 truncate block">{donorResult.diaChiGanNhat}</span>
+                {donorResult.diaDiemGanNhat && (
+                  <span className="text-[10px] text-slate-400 truncate block">{donorResult.diaDiemGanNhat}</span>
                 )}
               </div>
 

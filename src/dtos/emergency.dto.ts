@@ -16,7 +16,30 @@ export interface CreateEmergencyRequestDTO {
 }
 
 export interface DispatchEmergencyRequestDTO {
+  khoMauId?: number; // Lô kho máu cụ thể được chọn để xuất
+  khoMauIds?: number[]; // Danh sách các lô kho máu cụ thể
+  nhomMauXuat?: string; // Nhóm máu chọn xuất (nếu chọn xuất nhóm máu tương thích)
+  soLuongXuatMl?: number;
+  soLuongTui?: number;
   donViVanChuyen?: string;
+  bienSoXe?: string;
+  taiXe?: string;
+  soDienThoaiTaiXe?: string;
+  thoiGianNhanDuKien?: string | Date;
+  ghiChu?: string;
+}
+
+export interface DirectDispatchDTO {
+  benhVienNhan: string;
+  nhomMau: string;
+  thanhPhan?: ThanhPhanMau;
+  soLuongXuatMl?: number;
+  soLuongTui?: number;
+  khoMauId?: number;
+  donViVanChuyen?: string;
+  bienSoXe?: string;
+  taiXe?: string;
+  soDienThoaiTaiXe?: string;
   thoiGianNhanDuKien?: string | Date;
   ghiChu?: string;
 }

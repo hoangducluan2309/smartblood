@@ -5,9 +5,9 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "tsx watch src/server.ts",
     "dev:server": "tsx watch src/server.ts",
-    "build": "vite build",
+    "build": "tsc",
     "build:server": "tsc",
     "start": "node dist/server.js",
     "check:db": "tsx src/scripts/check-db.ts",

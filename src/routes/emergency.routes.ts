@@ -9,9 +9,11 @@ const emergencyRouter: Router = Router();
 // ==============================================================================
 // 1. TỒN KHO MÁU (/api/v1/blood-inventories)
 // ==============================================================================
-// Tổng hợp 8 nhóm máu (Summary)
+// Tổng hợp 8 nhóm máu (Summary - Chỉ ADMIN & HOSPITAL_STAFF)
 inventoryRouter.get(
   '/summary',
+  xacThucToken,
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => emergencyController.getInventorySummary(req, res, next)
 );
 
@@ -81,7 +83,31 @@ emergencyRouter.post(
   (req, res, next) => emergencyController.createRequest(req, res, next)
 );
 
-// Quản trị viên điều phối xuất kho chi viện máu (Admin)
+// Lấy danh sách lịch sử các chuyến xe điều phối máu đã xuất kho (Admin & Hospital Staff)
+emergencyRouter.get(
+  '/dispatches',
+  xacThucToken,
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
+  (req, res, next) => emergencyController.getDispatches(req, res, next)
+);
+
+// Cập nhật trạng thái chuyến xe vận chuyển cấp cứu (Admin & Hospital Staff)
+emergencyRouter.patch(
+  '/dispatches/:id/status',
+  xacThucToken,
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
+  (req, res, next) => emergencyController.updateDispatchStatus(req, res, next)
+);
+
+// Quản trị viên tạo lệnh điều phối xe cứu trợ & xuất kho trực tiếp (Admin)
+emergencyRouter.post(
+  '/direct-dispatch',
+  xacThucToken,
+  phanQuyen('ADMIN'),
+  (req, res, next) => emergencyController.directDispatch(req, res, next)
+);
+
+// Quản trị viên điều phối xuất kho chi viện máu cho ca cấp cứu (Admin)
 emergencyRouter.post(
   '/:id/dispatch',
   xacThucToken,

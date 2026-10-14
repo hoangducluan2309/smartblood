@@ -429,6 +429,52 @@ paths:
           $ref: '#/components/responses/UnauthorizedError'
         '403':
           $ref: '#/components/responses/ForbiddenError'
+    patch:
+      tags:
+        - Users
+      summary: Khóa / Mở khóa nhanh tài khoản (Chỉ Admin - Hỗ trợ PATCH)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID người dùng cần đổi trạng thái
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Đổi trạng thái thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã đổi trạng thái tài khoản thành Khoa.
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        example: 1
+                      trangThai:
+                        type: string
+                        example: Khoa
+                      message:
+                        type: string
+                        example: Đã đổi trạng thái tài khoản thành Khoa.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
 
   # ============================================================================
   # 2. DONATION EVENTS
@@ -625,6 +671,50 @@ paths:
       tags:
         - Donation Events
       summary: Đổi trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc - Chỉ Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID sự kiện cần cập nhật trạng thái
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSuKienStatusDTO'
+      responses:
+        '200':
+          description: Đổi trạng thái thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cập nhật trạng thái sự kiện thành công.
+                  data:
+                    $ref: '#/components/schemas/SuKienHienMau'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      tags:
+        - Donation Events
+      summary: Đổi trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc - Chỉ Admin - Hỗ trợ PATCH)
       security:
         - BearerAuth: []
       parameters:
@@ -1207,6 +1297,144 @@ paths:
                   data:
                     $ref: '#/components/schemas/YeuCauMauKhanCap'
 
+  /api/v1/emergency-requests/dispatches:
+    get:
+      tags:
+        - Emergency Requests
+      summary: Lấy danh sách lịch sử các chuyến xe điều phối đã xuất kho (Admin & Hospital Staff)
+      description: Dành cho Quản trị viên và Nhân viên bệnh viện theo dõi danh sách các chuyến xe 115, trạng thái giao nhận, biển số xe, tài xế và bệnh viện nhận.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Trang hiện tại (mặc định 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          description: Số lượng mỗi trang (mặc định 10)
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Lấy danh sách các chuyến xe điều phối thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Lấy danh sách các chuyến xe điều phối thành công.
+                  data:
+                    $ref: '#/components/schemas/PaginatedDispatchesResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /api/v1/emergency-requests/dispatches/{id}/status:
+    patch:
+      tags:
+        - Emergency Requests
+      summary: Cập nhật trạng thái chuyến xe vận chuyển cấp cứu (Admin & Hospital Staff)
+      description: Cập nhật tiến độ chuyến xe (DangGiao, DaNhan, DaHuy). Khi chuyển sang DaNhan, hệ thống tự động lưu thoiGianNhanThucTe.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID bản ghi điều phối (DieuPhoiMau ID)
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDispatchStatusDTO'
+      responses:
+        '200':
+          description: Cập nhật trạng thái vận chuyển thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Cập nhật trạng thái vận chuyển thành công.
+                  data:
+                    $ref: '#/components/schemas/DieuPhoiMau'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/emergency-requests/direct-dispatch:
+    post:
+      tags:
+        - Emergency Requests
+      summary: Tạo lệnh điều phối xe cứu trợ & xuất kho trực tiếp (Chỉ Admin)
+      description: Xuất kho khẩn cấp và tạo xe vận chuyển 115 chi viện trực tiếp cho bệnh viện mà không cần thông qua đơn tạo trước.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DirectDispatchDTO'
+      responses:
+        '201':
+          description: Xuất kho và tạo lệnh điều phối xe cứu trợ trực tiếp thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Xuất kho và tạo lệnh điều phối xe cứu trợ trực tiếp thành công.
+                  data:
+                    type: object
+                    properties:
+                      yeuCau:
+                        $ref: '#/components/schemas/YeuCauMauKhanCap'
+                      danhSachXuatKho:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DieuPhoiMau'
+                      tongLuongXuatMl:
+                        type: integer
+                        example: 700
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
   /api/v1/emergency-requests/{id}:
     delete:
       tags:
@@ -1295,12 +1523,90 @@ paths:
           $ref: '#/components/responses/ForbiddenError'
         '404':
           $ref: '#/components/responses/NotFoundError'
+    patch:
+      tags:
+        - Emergency Requests
+      summary: Tắt / Bỏ qua thẻ cấp cứu (Bác sĩ & Admin - Hỗ trợ PATCH)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID ca cấp cứu cần tắt
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DismissEmergencyDTO'
+      responses:
+        '200':
+          description: Tắt thẻ cấp cứu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã tắt thẻ cấp cứu thành công.
+                  data:
+                    $ref: '#/components/schemas/YeuCauMauKhanCap'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
 
   /api/v1/emergency-requests/{id}/restore:
     put:
       tags:
         - Emergency Requests
       summary: Khôi phục và mở lại thẻ cấp cứu (Bác sĩ & Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID ca cấp cứu cần khôi phục
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Khôi phục thẻ cấp cứu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đã khôi phục thẻ cấp cứu thành công.
+                  data:
+                    $ref: '#/components/schemas/YeuCauMauKhanCap'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      tags:
+        - Emergency Requests
+      summary: Khôi phục và mở lại thẻ cấp cứu (Bác sĩ & Admin - Hỗ trợ PATCH)
       security:
         - BearerAuth: []
       parameters:
@@ -1949,9 +2255,40 @@ components:
     DispatchEmergencyRequestDTO:
       type: object
       properties:
+        khoMauId:
+          type: integer
+          description: ID lô túi máu cụ thể muốn xuất
+          example: 1
+        khoMauIds:
+          type: array
+          items:
+            type: integer
+          description: Danh sách ID các lô túi máu được chọn
+          example: [1, 2]
+        nhomMauXuat:
+          type: string
+          description: Nhóm máu chọn xuất (trong trường hợp xuất nhóm máu tương thích)
+          example: 'O-'
+        soLuongXuatMl:
+          type: integer
+          description: Thể tích xuất kho (ml)
+          example: 700
+        soLuongTui:
+          type: integer
+          description: Số lượng túi máu xuất (mỗi túi tính 350ml nếu chưa chỉ định ml)
+          example: 2
         donViVanChuyen:
           type: string
-          example: Xe Cấp Cứu 115 - Chợ Rẫy
+          example: Đội Cấp Cứu 115
+        bienSoXe:
+          type: string
+          example: 51B-987.65
+        taiXe:
+          type: string
+          example: Nguyễn Văn Tài
+        soDienThoaiTaiXe:
+          type: string
+          example: '0901234567'
         thoiGianNhanDuKien:
           type: string
           format: date-time
@@ -1959,6 +2296,65 @@ components:
         ghiChu:
           type: string
           example: Ưu tiên còi hụ vận chuyển khẩn cấp trong 30 phút
+
+    DirectDispatchDTO:
+      type: object
+      required:
+        - benhVienNhan
+        - nhomMau
+      properties:
+        benhVienNhan:
+          type: string
+          example: Bệnh viện Chợ Rẫy
+        nhomMau:
+          type: string
+          example: 'O+'
+        thanhPhan:
+          type: string
+          enum: ['ToanPhan', 'HongCau', 'HuyetTuong', 'TieuCau']
+          default: 'ToanPhan'
+          example: 'ToanPhan'
+        soLuongXuatMl:
+          type: integer
+          example: 700
+        soLuongTui:
+          type: integer
+          example: 2
+        khoMauId:
+          type: integer
+          example: 1
+        donViVanChuyen:
+          type: string
+          example: Đội Cấp Cứu 115
+        bienSoXe:
+          type: string
+          example: 51B-123.45
+        taiXe:
+          type: string
+          example: Trần Hữu Trí
+        soDienThoaiTaiXe:
+          type: string
+          example: '0912345678'
+        thoiGianNhanDuKien:
+          type: string
+          format: date-time
+          example: '2026-10-15T02:00:00.000Z'
+        ghiChu:
+          type: string
+          example: Xuất kho hỏa tốc chi viện ca tai nạn đa chấn thương
+
+    UpdateDispatchStatusDTO:
+      type: object
+      required:
+        - trangThaiVanChuyen
+      properties:
+        trangThaiVanChuyen:
+          type: string
+          enum: ['ChuanBi', 'DangGiao', 'DaNhan', 'ThatBai', 'DaHuy']
+          example: 'DaNhan'
+        ghiChu:
+          type: string
+          example: Bệnh viện tiếp nhận đủ số lượng, nhiệt độ bảo quản chuẩn
 
     DieuPhoiMau:
       type: object
@@ -1980,11 +2376,11 @@ components:
           example: 700
         trangThaiVanChuyen:
           type: string
-          enum: ['ChuanBi', 'DangGiao', 'DaNhan', 'ThatBai']
+          enum: ['ChuanBi', 'DangGiao', 'DaNhan', 'ThatBai', 'DaHuy']
           example: 'DangGiao'
         donViVanChuyen:
           type: string
-          example: Xe Cấp Cứu 115 - Chợ Rẫy
+          example: 'Đội Cấp Cứu 115 [BS: 51B-987.65]'
         thoiGianXuat:
           type: string
           format: date-time
@@ -1993,6 +2389,103 @@ components:
           type: string
           format: date-time
           example: '2026-10-08T16:25:00.000Z'
+        thoiGianNhanThucTe:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-10-08T16:10:00.000Z'
+        ghiChu:
+          type: string
+          example: Tài xế Nguyễn Văn Tài (0901234567). Xuất chi viện BV Chợ Rẫy
+
+    PaginatedDispatchesResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DieuPhoiMauDetail'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    DieuPhoiMauDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        yeuCauId:
+          type: integer
+          example: 1
+        khoMauId:
+          type: integer
+          example: 2
+        nguoiDieuPhoiId:
+          type: integer
+          example: 1
+        soLuongXuatMl:
+          type: integer
+          example: 700
+        trangThaiVanChuyen:
+          type: string
+          enum: ['ChuanBi', 'DangGiao', 'DaNhan', 'ThatBai', 'DaHuy']
+          example: 'DangGiao'
+        donViVanChuyen:
+          type: string
+          example: 'Đội Cấp Cứu 115 [BS: 51B-987.65]'
+        thoiGianXuat:
+          type: string
+          format: date-time
+          example: '2026-10-08T14:25:00.000Z'
+        thoiGianNhanDuKien:
+          type: string
+          format: date-time
+          example: '2026-10-08T16:25:00.000Z'
+        thoiGianNhanThucTe:
+          type: string
+          format: date-time
+          nullable: true
+        ghiChu:
+          type: string
+        yeuCau:
+          type: object
+          properties:
+            id:
+              type: integer
+            benhVienYeuCau:
+              type: string
+            nhomMauCan:
+              type: string
+            thanhPhanCan:
+              type: string
+            mucDoKhanCap:
+              type: string
+            lyDo:
+              type: string
+            trangThai:
+              type: string
+        khoMau:
+          type: object
+          properties:
+            id:
+              type: integer
+            nhomMau:
+              type: string
+            thanhPhan:
+              type: string
+            donViLuuTru:
+              type: string
+        nguoiDieuPhoi:
+          type: object
+          properties:
+            id:
+              type: integer
+            hoTen:
+              type: string
+            email:
+              type: string
+            soDienThoai:
+              type: string
 
     # --- Forecast Schemas ---
     BloodGroupRiskDetail:

@@ -33,6 +33,7 @@ router.put('/:id', (req, res, next) => userController.updateUser(req, res, next)
 
 // 5. Khóa / Mở khóa nhanh tài khoản
 router.put('/:id/status', (req, res, next) => userController.toggleUserStatus(req, res, next));
+router.patch('/:id/status', (req, res, next) => userController.toggleUserStatus(req, res, next));
 
 // 6. Xóa vĩnh viễn tài khoản người dùng
 router.delete('/:id', (req, res, next) => userController.deleteUser(req, res, next));
