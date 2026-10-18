@@ -144,6 +144,65 @@ paths:
                 $ref: '#/components/schemas/ProfileSuccessResponse'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
+    put:
+      tags:
+        - Auth
+      summary: Cập nhật hồ sơ cá nhân người dùng hiện tại
+      description: Cập nhật họ tên, email, số điện thoại và địa chỉ của tài khoản đang đăng nhập.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMyProfileDTO'
+      responses:
+        '200':
+          description: Cập nhật hồ sơ thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileSuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /api/v1/auth/change-password:
+    put:
+      tags:
+        - Auth
+      summary: Đổi mật khẩu tài khoản hiện tại
+      description: Yêu cầu mật khẩu hiện tại chính xác, mật khẩu mới tối thiểu 8 ký tự và xác nhận trùng khớp.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeMyPasswordDTO'
+      responses:
+        '200':
+          description: Đổi mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đổi mật khẩu thành công.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
 
   # ============================================================================
   # 1B. USER MANAGEMENT (Chỉ Quản trị viên - ADMIN)
@@ -373,6 +432,61 @@ paths:
                       message:
                         type: string
                         example: Đã xóa vĩnh viễn tài khoản [Nguyễn Văn A] thành công.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v1/users/{id}/password:
+    put:
+      tags:
+        - Users
+      summary: Đặt lại mật khẩu của tài khoản (Chỉ Admin)
+      description: Admin có thể đặt mật khẩu mới cho tài khoản khác. Không cho phép đặt lại mật khẩu của chính mình qua endpoint này.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID tài khoản cần đổi mật khẩu
+          schema:
+            type: integer
+            example: 2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - matKhauMoi
+              properties:
+                matKhauMoi:
+                  type: string
+                  format: password
+                  minLength: 8
+                  maxLength: 64
+                  description: Cần chữ hoa, chữ thường, chữ số và ký tự đặc biệt; tối đa 72 byte UTF-8 để tương thích bcrypt.
+                  example: NewPassword@123
+      responses:
+        '200':
+          description: Đặt lại mật khẩu thành công
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Đặt lại mật khẩu tài khoản thành công.
         '400':
           $ref: '#/components/responses/BadRequestError'
         '401':
@@ -1875,7 +1989,9 @@ components:
         matKhau:
           type: string
           format: password
-          minLength: 6
+          description: 8–64 ký tự, có chữ hoa, chữ thường, chữ số và ký tự đặc biệt ASCII; tối đa 72 byte UTF-8 để tương thích bcrypt.
+          minLength: 8
+          maxLength: 64
           example: Password@123
         soDienThoai:
           type: string
@@ -1994,6 +2110,57 @@ components:
           example: Lấy thông tin tài khoản thành công.
         data:
           $ref: '#/components/schemas/UserResponse'
+
+    UpdateMyProfileDTO:
+      type: object
+      required:
+        - hoTen
+        - email
+        - soDienThoai
+      properties:
+        hoTen:
+          type: string
+          maxLength: 100
+          example: Nguyễn Văn An
+        email:
+          type: string
+          format: email
+          maxLength: 100
+          example: an.nguyen@example.com
+        soDienThoai:
+          type: string
+          maxLength: 15
+          example: '0901234567'
+        diaChi:
+          type: string
+          maxLength: 255
+          example: Quận 1, TP. Hồ Chí Minh
+
+    ChangeMyPasswordDTO:
+      type: object
+      required:
+        - matKhauHienTai
+        - matKhauMoi
+        - xacNhanMatKhau
+      properties:
+        matKhauHienTai:
+          type: string
+          format: password
+          example: CurrentPass123
+        matKhauMoi:
+          type: string
+          format: password
+          description: 8–64 ký tự, có chữ hoa, chữ thường, chữ số và ký tự đặc biệt ASCII; tối đa 72 byte UTF-8 để tương thích bcrypt.
+          minLength: 8
+          maxLength: 64
+          example: NewPass123!
+        xacNhanMatKhau:
+          type: string
+          format: password
+          description: Phải trùng với mật khẩu mới và đáp ứng chính sách mật khẩu.
+          minLength: 8
+          maxLength: 64
+          example: NewPass123!
 
     # --- Donation Schemas ---
     CreateSuKienDTO:
@@ -2676,7 +2843,9 @@ components:
         matKhau:
           type: string
           format: password
-          minLength: 6
+          description: 8–64 ký tự, có chữ hoa, chữ thường, chữ số và ký tự đặc biệt ASCII; tối đa 72 byte UTF-8 để tương thích bcrypt.
+          minLength: 8
+          maxLength: 64
           example: Password@123
         soDienThoai:
           type: string
@@ -2718,7 +2887,9 @@ components:
         matKhau:
           type: string
           format: password
-          minLength: 6
+          description: Nếu gửi mật khẩu, mật khẩu phải dài 8–64 ký tự, có chữ hoa, chữ thường, chữ số và ký tự đặc biệt ASCII; tối đa 72 byte UTF-8 để tương thích bcrypt.
+          minLength: 8
+          maxLength: 64
           example: NewPassword@123
         soDienThoai:
           type: string
@@ -2947,4 +3118,3 @@ components:
         lyDo:
           type: string
           example: Bệnh viện đã được chi viện từ ngân hàng máu vệ tinh
-
