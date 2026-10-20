@@ -1,0 +1,182 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --color-blood-primary: #DC2626;
+  --color-blood-dark: #991B1B;
+  --color-surface: #F8FAFC;
+  --color-success: #16A34A;
+  --color-warning: #D97706;
+
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: #1e293b;
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    touch-action: manipulation;
+  }
+}
+
+/* Leaflet Container & Z-index Isolation */
+.leaflet-pane {
+  z-index: 10 !important;
+}
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
+}
+.leaflet-popup {
+  z-index: 30 !important;
+}
+
+/* Custom Utilities for Medical & Emergency Indicators */
+@keyframes pulse-blood {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+    box-shadow: 0 0 0 12px rgba(220, 38, 38, 0);
+  }
+}
+
+.animate-pulse-blood {
+  animation: pulse-blood 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* 3D Floating & Ambient Animations (Envato Style) */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate3d(1, 1, 0, 0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate3d(1, 1, 0, 2deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate3d(0, 1, 1, 0deg);
+  }
+  50% {
+    transform: translateY(10px) rotate3d(0, 1, 1, -2deg);
+  }
+}
+
+@keyframes mesh-glow {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(25px, -20px) scale(1.15);
+    opacity: 0.8;
+  }
+}
+
+@keyframes holographic-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 7s ease-in-out infinite;
+}
+
+.animate-mesh-glow {
+  animation: mesh-glow 10s ease-in-out infinite alternate;
+}
+
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+/* 3D Card Hover Depth */
+.card-3d-hover {
+  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease;
+  transform: perspective(1000px) rotateX(0deg) rotateY(0deg) translateZ(0);
+}
+
+.card-3d-hover:hover {
+  transform: perspective(1000px) rotateX(2deg) rotateY(-2deg) translateZ(12px) translateY(-6px);
+  box-shadow: 0 25px 50px -12px rgba(220, 38, 38, 0.15), 0 0 25px rgba(239, 68, 68, 0.08);
+}
+
+/* Envato Glassmorphism */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.glass-panel-dark {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Gradient Borders */
+.gradient-border-red {
+  position: relative;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9));
+  background-clip: padding-box;
+  border: 1px solid transparent;
+}
+.gradient-border-red::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  z-index: -1;
+  margin: -1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.4), rgba(147, 51, 234, 0.2), rgba(59, 130, 246, 0.3));
+}
+
+/* Safe area padding for mobile notches / home indicators */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 1rem);
+}
+
+@keyframes emergency-alert-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.emergency-alert-track {
+  display: flex;
+  width: max-content;
+  animation: emergency-alert-marquee 24s linear infinite;
+  will-change: transform;
+}

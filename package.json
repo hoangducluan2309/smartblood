@@ -1,21 +1,19 @@
 {
-  "name": "smartblood",
+  "name": "smartblood-monorepo",
+  "private": true,
   "version": "1.0.0",
-  "description": "He thong dieu phoi hien mau nhan dao va du bao nhu cau mau khan cap",
+  "description": "Hệ thống điều phối hiến máu nhân đạo và dự báo nhu cầu máu y tế SmartBlood",
   "scripts": {
-    "dev": "npm run dev --prefix client",
-    "client": "npm run dev --prefix client",
-    "server": "npm run dev --prefix server",
-    "build": "npm run build --prefix client"
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue.bold,green.bold\" \"pnpm --prefix Backend dev\" \"pnpm --prefix Frontend dev\"",
+    "dev:backend": "pnpm --prefix Backend dev",
+    "dev:frontend": "pnpm --prefix Frontend dev",
+    "start:backend": "pnpm --prefix Backend start",
+    "build:frontend": "pnpm --prefix Frontend build",
+    "build:backend": "pnpm --prefix Backend build",
+    "build": "pnpm --prefix Frontend build && pnpm --prefix Backend build",
+    "install:all": "pnpm install && pnpm --prefix Backend install && pnpm --prefix Frontend install"
   },
-  "keywords": [
-    "blood-donation",
-    "smartblood",
-    "react",
-    "vite",
-    "express",
-    "socketio"
-  ],
-  "author": "SmartBlood Team",
-  "license": "ISC"
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
 }
