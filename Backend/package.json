@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "test:e2e": "tsx src/scripts/run-e2e-tests.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
