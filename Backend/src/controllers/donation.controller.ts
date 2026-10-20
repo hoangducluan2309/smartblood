@@ -43,7 +43,7 @@ export class DonationController {
 
   /**
    * POST /api/v1/donation-events
-   * Chỉ ADMIN: Tạo sự kiện hiến máu mới
+   * ADMIN & HOSPITAL_STAFF (Bác sĩ): Tạo sự kiện hiến máu mới
    */
   async createEvent(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -112,7 +112,7 @@ export class DonationController {
 
   /**
    * PUT /api/v1/donation-events/:id
-   * Admin: Cập nhật sự kiện hiến máu
+   * Admin & Hospital Staff (Bác sĩ): Cập nhật sự kiện hiến máu
    */
   async updateEvent(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -131,7 +131,7 @@ export class DonationController {
 
   /**
    * PUT /api/v1/donation-events/:id/status
-   * Admin: Cập nhật trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc)
+   * Admin & Hospital Staff (Bác sĩ): Cập nhật trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc)
    */
   async updateEventStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -152,7 +152,7 @@ export class DonationController {
 
   /**
    * DELETE /api/v1/donation-events/:id
-   * Admin: Xóa sự kiện hiến máu
+   * Admin & Hospital Staff (Bác sĩ): Xóa sự kiện hiến máu
    */
   async deleteEvent(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

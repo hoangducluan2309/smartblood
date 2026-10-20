@@ -10,8 +10,7 @@ import {
   Siren,
   PowerOff,
   CheckCircle2,
-  ShieldCheck,
-  RotateCcw
+  ShieldCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useEmergency } from '../contexts/EmergencyContext';
@@ -21,10 +20,9 @@ import { DismissEmergencyModal } from '../components/emergency/DismissEmergencyM
 import { EmergencyCardItem } from '../types';
 
 export const EmergencyPage: React.FC = () => {
-  const { emergencyList, dismissEmergencyCard, restoreEmergencyCard } = useEmergency();
+  const { emergencyList, dismissEmergencyCard } = useEmergency();
   const { user } = useAuth();
   const { openCallModal } = useCallModal();
-  const [statusTab, setStatusTab] = useState<'ACTIVE' | 'DISMISSED' | 'ALL'>('ACTIVE');
   const [selectedGroup, setSelectedGroup] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [dismissTarget, setDismissTarget] = useState<EmergencyCardItem | null>(null);
@@ -33,15 +31,9 @@ export const EmergencyPage: React.FC = () => {
   // Quyền hạn: Chỉ Bác sĩ (HOSPITAL_STAFF) và Admin có quyền tắt thẻ cấp cứu
   const canDismiss = user?.role === 'ADMIN' || user?.role === 'HOSPITAL_STAFF';
 
-  const activeCount = emergencyList.filter((r) => !r.isDismissed).length;
-  const dismissedCount = emergencyList.filter((r) => r.isDismissed).length;
-
-  // Lọc theo trạng thái tab: Đang khẩn cấp (mặc định), Đã tắt, hoặc Tất cả
-  const currentRequests = emergencyList.filter((r) => {
-    if (statusTab === 'ACTIVE') return !r.isDismissed;
-    if (statusTab === 'DISMISSED') return r.isDismissed;
-    return true; // 'ALL'
-  });
+  // Chỉ hiển thị các ca cấp cứu Đang Khẩn Cấp để Donor và người dùng xem
+  const currentRequests = emergencyList.filter((r) => !r.isDismissed);
+  const activeCount = currentRequests.length;
 
   const bloodGroups = ['ALL', 'O-', 'O+', 'A-', 'A+', 'B-', 'B+', 'AB-', 'AB+'];
 
@@ -60,11 +52,6 @@ export const EmergencyPage: React.FC = () => {
     await dismissEmergencyCard(dismissTarget.id, reason);
     toast.success(`Đã tắt thành công thẻ cấp cứu ${dismissTarget.id} cho ${dismissTarget.patient}!`);
     setDismissTarget(null);
-  };
-
-  const handleConfirmRestore = async (card: EmergencyCardItem) => {
-    await restoreEmergencyCard(card.id);
-    toast.success(`Đã khôi phục và mở lại thẻ cấp cứu ${card.id}!`);
   };
 
   return (
@@ -95,59 +82,24 @@ export const EmergencyPage: React.FC = () => {
           <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-start w-full md:w-auto pt-3 md:pt-0 border-t border-white/20 md:border-t-0 shrink-0">
             <div className="text-left md:text-right">
               <span className="text-3xl md:text-4xl font-black text-amber-200">
-                {statusTab === 'DISMISSED' ? dismissedCount : activeCount}
+                {activeCount}
               </span>
               <span className="block text-[11px] md:text-xs uppercase font-extrabold text-white/95 tracking-wide">
-                {statusTab === 'DISMISSED' ? 'Ca Đã Kết Thúc / Đã Tắt' : 'Ca Đang Cần Máu Khẩn Cấp'}
+                Ca Đang Cần Máu Khẩn Cấp
               </span>
             </div>
             <span className="text-[11px] text-amber-100/90 font-semibold md:mt-0.5 text-right">
-              {statusTab === 'DISMISSED' 
-                ? `(Còn ${activeCount} ca khẩn cấp / Tổng ${emergencyList.length} ca)`
-                : `(Đã tắt ${dismissedCount} / Tổng ${emergencyList.length} ca trong CSDL)`}
+              (Đồng bộ thời gian thực từ CSDL)
             </span>
           </div>
         </div>
       </div>
 
-      {/* 2. CHỌN TAB TRẠNG THÁI (ĐANG KHẨN CẤP / ĐÃ TẮT / TẤT CẢ) */}
+      {/* 2. TRẠNG THÁI CA CẤP CỨU ĐANG HOẠT ĐỘNG */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/90 backdrop-blur-md p-3 sm:p-4 rounded-3xl border border-slate-200/80 shadow-2xs">
-        
-        {/* Tab status switcher - Mặc định là Đang Khẩn Cấp khớp 100% với Navbar */}
-        <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200 shadow-inner">
-          <button
-            type="button"
-            onClick={() => setStatusTab('ACTIVE')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              statusTab === 'ACTIVE'
-                ? 'bg-red-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Đang Khẩn Cấp ({activeCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab('DISMISSED')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              statusTab === 'DISMISSED'
-                ? 'bg-slate-800 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Đã Tắt / Xong ({dismissedCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatusTab('ALL')}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-              statusTab === 'ALL'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Tất Cả ({emergencyList.length})
-          </button>
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-red-600 text-white shadow-xs text-xs font-black">
+          <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
+          <span>Đang Khẩn Cấp ({activeCount})</span>
         </div>
 
         {/* Thông tin hỗ trợ */}
@@ -358,16 +310,6 @@ export const EmergencyPage: React.FC = () => {
                     </button>
                   )}
 
-                  {canDismiss && item.isDismissed && (
-                    <button
-                      type="button"
-                      onClick={() => handleConfirmRestore(item)}
-                      className="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border border-emerald-200/90 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow-2xs"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Khôi Phục / Bật Lại Thẻ Cấp Cứu</span>
-                    </button>
-                  )}
                 </div>
 
               </div>

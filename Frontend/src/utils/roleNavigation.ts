@@ -44,6 +44,7 @@ export const getRoleDestination = (
     if (
       requestedPath.startsWith('/admin') ||
       requestedPath.startsWith('/staff') ||
+      requestedPath === '/events' ||
       requestedPath === '/inventory' ||
       requestedPath === '/profile'
     ) {
@@ -52,6 +53,7 @@ export const getRoleDestination = (
   } else if (role === 'HOSPITAL_STAFF') {
     if (
       requestedPath.startsWith('/staff') ||
+      requestedPath === '/events' ||
       requestedPath === '/inventory' ||
       requestedPath === '/profile'
     ) {
@@ -60,6 +62,7 @@ export const getRoleDestination = (
   } else if (role === 'DONOR') {
     if (
       requestedPath === '/book-appointment' ||
+      requestedPath === '/events' ||
       requestedPath.startsWith('/my-') ||
       requestedPath === '/profile'
     ) {

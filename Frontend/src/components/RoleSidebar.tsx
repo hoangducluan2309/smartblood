@@ -34,18 +34,21 @@ const roleLabels: Record<UserRole, string> = {
 
 const roleItems: Record<UserRole, SidebarItem[]> = {
   DONOR: [
-    { label: 'Đặt lịch hiến máu', path: '/book-appointment', icon: CalendarCheck },
+    { label: 'Sự kiện hiến máu', path: '/events', icon: CalendarCheck },
+    { label: 'Đặt lịch hiến máu', path: '/book-appointment', icon: Heart },
     { label: 'Lịch sử hiến máu', path: '/my-history', icon: Heart },
     { label: 'Hồ sơ cá nhân', path: '/profile', icon: CircleUserRound },
   ],
   HOSPITAL_STAFF: [
     { label: 'Tiếp nhận & duyệt lịch', path: '/staff/reception', icon: ClipboardCheck },
+    { label: 'Sự kiện hiến máu', path: '/events', icon: CalendarCheck },
     { label: 'Phát lệnh cấp cứu', path: '/staff/emergency-request', icon: ShieldAlert },
     { label: 'Kho dự trữ máu', path: '/inventory', icon: Package },
     { label: 'Hồ sơ cá nhân', path: '/profile', icon: CircleUserRound },
   ],
   ADMIN: [
     { label: 'Tổng quan hệ thống', path: '/admin', icon: LayoutDashboard },
+    { label: 'Sự kiện hiến máu', path: '/events', icon: CalendarCheck },
     { label: 'Duyệt lịch hiến máu', path: '/admin/appointments', icon: ClipboardCheck },
     { label: 'Yêu cầu cấp cứu', path: '/staff/emergency-request', icon: ShieldAlert },
     { label: 'Điều phối xe 115', path: '/admin/dispatch', icon: Ambulance },

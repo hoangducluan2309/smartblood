@@ -107,7 +107,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         moTa: '',
       });
     } catch (err: any) {
-      const msg = err.response?.data?.message || 'Có lỗi xảy ra khi tạo sự kiện. Vui lòng kiểm tra lại quyền Admin.';
+      const msg = err.response?.data?.message || 'Có lỗi xảy ra khi tạo sự kiện. Vui lòng kiểm tra lại quyền Admin hoặc Bác sĩ.';
       setErrorMsg(msg);
       toast.error(msg);
     } finally {
@@ -132,11 +132,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl font-black tracking-tight">Tạo Sự Kiện Hiến Máu Mới</h3>
                   <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-white/20 text-white rounded-md border border-white/30 backdrop-blur-sm">
-                    Admin Exclusive
+                    Admin & Bác Sĩ
                   </span>
                 </div>
                 <p className="text-xs text-red-100 mt-0.5">
-                  Chỉ Quản trị viên hệ thống có quyền phát động chiến dịch tiếp nhận máu
+                  Quản trị viên & Bác sĩ phụ trách có quyền phát động chiến dịch tiếp nhận máu
                 </p>
               </div>
             </div>
@@ -159,6 +159,41 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
             </div>
           )}
 
+          {/* Gợi ý mẫu sự kiện tiêu biểu */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
+              Gợi ý mẫu sự kiện tiêu biểu (Bấm để điền nhanh):
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({
+                  ...prev,
+                  tenSuKien: 'Hành Trình Đỏ - Giọt Hồng Tình Nguyện 2026',
+                  diaDiem: 'Nhà Văn Hóa Thanh Niên, Số 4 Phạm Ngọc Thạch, Bến Nghé, Quận 1, TP.HCM',
+                  soLuongDuKien: 200,
+                  moTa: 'Chiến dịch hiến máu tình nguyện quy mô toàn thành phố nhằm bổ sung lượng máu dự trữ trước dịp lễ.',
+                }))}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-red-50 text-red-700 border border-red-200 text-xs font-bold shadow-2xs hover:border-red-300 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🩸 Hành Trình Đỏ - Giọt Hồng Tình Nguyện 2026</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setForm(prev => ({
+                  ...prev,
+                  tenSuKien: 'Ngày Hội Hiến Máu Khẩn Cấp - Vì Bệnh Nhân Thalassemia',
+                  diaDiem: 'Hội Trường A - Bệnh Viện Truyền Máu Huyết Học, 118 Hồng Bàng, Quận 5, TP.HCM',
+                  soLuongDuKien: 150,
+                  moTa: 'Chương trình tiếp nhận máu khẩn cấp hỗ trợ bệnh nhi tan máu bẩm sinh và phẫu thuật cấp cứu.',
+                }))}
+                className="px-3 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold shadow-2xs hover:border-rose-300 transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🏥 Vì Bệnh Nhân Thalassemia</span>
+              </button>
+            </div>
+          </div>
+
           {/* Tên sự kiện */}
           <div>
             <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">
@@ -172,7 +207,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                 required
                 value={form.tenSuKien}
                 onChange={handleChange}
-                placeholder="Ví dụ: Ngày Hội Giọt Hồng Nghĩa Tình 2026 - Quận 1"
+                placeholder="Ví dụ: Hành Trình Đỏ - Giọt Hồng Tình Nguyện 2026"
                 className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
               />
             </div>

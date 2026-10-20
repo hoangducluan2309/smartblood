@@ -368,6 +368,7 @@ export const Navbar: React.FC = () => {
   const breadcrumbLabels: Record<string, string> = {
     '/admin': 'Quản trị',
     '/staff': 'Bác sĩ',
+    '/events': 'Sự kiện hiến máu',
     '/book-appointment': 'Đặt lịch hiến máu',
     '/my-history': 'Lịch sử hiến máu',
     '/my-donations': 'Lịch sử hiến máu',

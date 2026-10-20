@@ -14,11 +14,11 @@ const appointmentRouter: Router = Router();
 // Xem danh sách sự kiện (Public / Tình nguyện viên - Hỗ trợ Tìm kiếm, Lọc, Phân trang)
 eventRouter.get('/', (req, res, next) => donationController.getEvents(req, res, next));
 
-// Tạo sự kiện mới (Chỉ ADMIN - Có validation dữ liệu đầu vào)
+// Tạo sự kiện mới (Chỉ ADMIN & BÁC SĨ / HOSPITAL_STAFF - Có validation dữ liệu đầu vào)
 eventRouter.post(
   '/',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   validateBody([
     Validators.required('tenSuKien', 'Tên sự kiện'),
     Validators.required('diaDiem', 'Địa điểm'),
@@ -28,34 +28,34 @@ eventRouter.post(
   (req, res, next) => donationController.createEvent(req, res, next)
 );
 
-// Cập nhật sự kiện (Chỉ ADMIN)
+// Cập nhật sự kiện (ADMIN & BÁC SĨ / HOSPITAL_STAFF)
 eventRouter.put(
   '/:id',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => donationController.updateEvent(req, res, next)
 );
 
-// Cập nhật trạng thái sự kiện: Tắt / Mở lại (Chỉ ADMIN)
+// Cập nhật trạng thái sự kiện: Tắt / Mở lại (ADMIN & BÁC SĨ / HOSPITAL_STAFF)
 eventRouter.put(
   '/:id/status',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => donationController.updateEventStatus(req, res, next)
 );
 
 eventRouter.patch(
   '/:id/status',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => donationController.updateEventStatus(req, res, next)
 );
 
-// Xóa sự kiện (Chỉ ADMIN)
+// Xóa sự kiện (ADMIN & BÁC SĨ / HOSPITAL_STAFF)
 eventRouter.delete(
   '/:id',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => donationController.deleteEvent(req, res, next)
 );
 

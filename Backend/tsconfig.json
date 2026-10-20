@@ -10,9 +10,13 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "rootDir": "./src",
     "outDir": "./dist"
   },
   "include": [
     "src/**/*"
+  ],
+  "exclude": [
+    "src/services/api.ts"
   ]
 }

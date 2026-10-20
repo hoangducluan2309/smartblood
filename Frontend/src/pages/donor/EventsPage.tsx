@@ -4,6 +4,8 @@ import { axiosClient } from '../../api/axiosClient';
 import { EventMap } from '../../components/map/EventMap';
 import { BookModal } from '../../components/donor/BookModal';
 import { CreateEventModal } from '../../components/admin/CreateEventModal';
+import { EditEventModal } from '../../components/admin/EditEventModal';
+import { DeleteEventModal } from '../../components/admin/DeleteEventModal';
 import { DismissEventModal } from '../../components/admin/DismissEventModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { 
@@ -14,13 +16,14 @@ import {
   LayoutGrid, 
   Map as MapIcon, 
   Heart, 
-  ArrowRight,
   Building2,
   PlusCircle,
   PowerOff,
   RotateCcw,
   Ban,
-  CheckCircle2
+  CheckCircle2,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -28,37 +31,37 @@ import toast from 'react-hot-toast';
 const MOCK_EVENTS: DonationEvent[] = [
   {
     id: 1,
-    tenSuKien: 'Ngày Hội Hiến Máu Nhân Đạo - Giọt Hồng Tri Ân 2026',
+    tenSuKien: 'Hành Trình Đỏ - Giọt Hồng Tình Nguyện 2026',
     diaDiem: 'Nhà Văn Hóa Thanh Niên TP.HCM',
     diaChi: 'Số 04 Phạm Ngọc Thạch, Phường Bến Nghé',
     quanHuyen: 'Quận 1',
-    ngayToChuc: '2026-10-18',
+    ngayToChuc: '2026-10-27',
     gioBatDau: '07:30',
     gioKetThuc: '11:30',
     lat: 10.7818,
     lng: 106.6985,
     daDangKy: 145,
     chiTieu: 200,
-    donViToChuc: 'Hội Chữ Thập Đỏ TP.HCM',
-    ghiChu: 'Tặng quà lưu niệm và bồi dưỡng theo quy định Bộ Y Tế.',
+    donViToChuc: 'Ban Chỉ Đạo Quốc Gia & Hội Chữ Thập Đỏ TP.HCM',
+    ghiChu: 'Chiến dịch hiến máu tình nguyện quy mô toàn thành phố nhằm bổ sung lượng máu dự trữ trước dịp lễ.',
     trangThai: 'SapDienRa',
     isDismissed: false,
   },
   {
     id: 2,
-    tenSuKien: 'Chiến Dịch Hành Trình Đỏ - Ngày Hội Thanh Niên Y Dược',
-    diaDiem: 'Đại Học Y Dược TP.HCM (Khuôn viên chính)',
-    diaChi: '217 Hồng Bàng, Phường 11',
+    tenSuKien: 'Ngày Hội Hiến Máu Khẩn Cấp - Vì Bệnh Nhân Thalassemia',
+    diaDiem: 'Hội Trường A - Bệnh Viện Truyền Máu Huyết Học TP.HCM',
+    diaChi: '118 Hồng Bàng, Phường 12',
     quanHuyen: 'Quận 5',
-    ngayToChuc: '2026-10-25',
+    ngayToChuc: '2026-11-03',
     gioBatDau: '08:00',
     gioKetThuc: '12:00',
-    lat: 10.7554,
-    lng: 106.6579,
+    lat: 10.7548,
+    lng: 106.6612,
     daDangKy: 89,
     chiTieu: 150,
-    donViToChuc: 'Bệnh viện Chợ Rẫy & ĐH Y Dược',
-    ghiChu: 'Ưu tiên tiếp nhận người hiến nhóm máu O và AB.',
+    donViToChuc: 'Bệnh Viện Truyền Máu Huyết Học & Khoa Nhi',
+    ghiChu: 'Chương trình tiếp nhận máu khẩn cấp hỗ trợ bệnh nhi tan máu bẩm sinh và phẫu thuật cấp cứu.',
     trangThai: 'SapDienRa',
     isDismissed: false,
   },
@@ -127,10 +130,12 @@ export const EventsPage: React.FC = () => {
   const [selectedEvent, setSelectedEvent] = useState<DonationEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<DonationEvent | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DonationEvent | null>(null);
   const [dismissTarget, setDismissTarget] = useState<DonationEvent | null>(null);
 
-  // Quyền hạn: Chỉ Admin có quyền tắt / mở lại thẻ sự kiện
-  const canDismiss = user?.role === 'ADMIN';
+  // Quyền hạn: Chỉ Admin và Bác Sĩ (HOSPITAL_STAFF) có quyền tạo, sửa, xóa và bật/tắt thẻ sự kiện
+  const canManage = user?.role === 'ADMIN' || user?.role === 'HOSPITAL_STAFF';
 
   // Số lượng sự kiện theo trạng thái
   const activeCount = events.filter((e) => !e.isDismissed && e.trangThai !== 'DaHuy').length;
@@ -193,7 +198,39 @@ export const EventsPage: React.FC = () => {
     fetchEvents();
   }, []);
 
-  // Xử lý Admin tắt thẻ sự kiện (Đồng bộ SQL Server)
+  // Tự động mở modal Đăng ký khi người dùng điều hướng từ Trang Chủ với query ?id=... hoặc ?eventId=...
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const targetId = params.get('id') || params.get('eventId');
+    if (targetId && events.length > 0) {
+      const found = events.find((e) => String(e.id) === String(targetId));
+      if (found && !found.isDismissed && found.trangThai !== 'DaHuy') {
+        setSelectedEvent(found);
+        setIsModalOpen(true);
+      }
+    }
+  }, [events]);
+
+  // Xử lý Xóa sự kiện hiến máu (Admin & Bác sĩ)
+  const handleConfirmDelete = async (target: DonationEvent) => {
+    try {
+      // Cập nhật UI ngay lập tức
+      setEvents((prev) => prev.filter((e) => e.id !== target.id));
+
+      // Đồng bộ xóa trên SQL Server qua Backend API
+      await axiosClient.delete(`/donation-events/${target.id}`);
+
+      toast.success(`Đã xóa vĩnh viễn sự kiện "${target.tenSuKien}" thành công!`);
+    } catch (err: any) {
+      console.error('Lỗi khi xóa sự kiện:', err);
+      toast.error(err.response?.data?.message || 'Có lỗi xảy ra khi xóa sự kiện.');
+      fetchEvents();
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  // Xử lý Admin & Bác sĩ tắt thẻ sự kiện (Đồng bộ SQL Server)
   const handleConfirmDismiss = async (reason: string) => {
     if (!dismissTarget) return;
     const target = dismissTarget;
@@ -223,7 +260,7 @@ export const EventsPage: React.FC = () => {
     }
   };
 
-  // Xử lý Admin khôi phục / mở lại thẻ sự kiện (Đồng bộ SQL Server)
+  // Xử lý Admin & Bác sĩ khôi phục / mở lại thẻ sự kiện (Đồng bộ SQL Server)
   const handleConfirmRestore = async (evt: DonationEvent) => {
     try {
       // Cập nhật UI ngay lập tức
@@ -296,8 +333,8 @@ export const EventsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 self-start md:self-auto">
-          {/* Nút Tạo Sự Kiện Mới: Chỉ Admin có quyền hiển thị và thao tác */}
-          {user?.role === 'ADMIN' && (
+          {/* Nút Tạo Sự Kiện Mới: Chỉ Admin và Bác Sĩ có quyền hiển thị và thao tác */}
+          {canManage && (
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(true)}
@@ -306,7 +343,7 @@ export const EventsPage: React.FC = () => {
               <PlusCircle className="w-4 h-4" />
               <span>+ Tạo Sự Kiện Mới</span>
               <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-white/20 text-white rounded">
-                Admin
+                {user?.role === 'ADMIN' ? 'Admin' : 'Bác Sĩ'}
               </span>
             </button>
           )}
@@ -379,10 +416,13 @@ export const EventsPage: React.FC = () => {
           </button>
         </div>
 
-        {canDismiss && (
+        {canManage && (
           <div className="text-xs text-slate-500 font-medium flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Quyền Admin: <strong className="text-slate-700">Có quyền Bật / Tắt các thẻ sự kiện</strong></span>
+            <span>
+              Quyền {user?.role === 'ADMIN' ? 'Admin' : 'Bác Sĩ'}:{' '}
+              <strong className="text-slate-700">Có quyền Tạo, Sửa, Xóa và Bật/Tắt thẻ sự kiện</strong>
+            </span>
           </div>
         )}
       </div>
@@ -496,15 +536,15 @@ export const EventsPage: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      {/* Nút thao tác Admin: Tắt thẻ hoặc Mở lại */}
-                      {canDismiss && (
+                      {/* Nút thao tác Admin & Bác sĩ: Tắt thẻ hoặc Mở lại */}
+                      {canManage && (
                         <div>
                           {!isDismissed ? (
                             <button
                               type="button"
                               onClick={() => setDismissTarget(evt)}
                               title="Tắt thẻ sự kiện này"
-                              className="px-2.5 py-1 rounded-xl bg-red-50 hover:bg-red-600 text-red-700 hover:text-white transition-all text-[11px] font-black flex items-center gap-1 cursor-pointer border border-red-200 hover:border-red-600 shadow-2xs group/btn active:scale-95"
+                              className="px-2.5 py-1 rounded-xl bg-amber-50 hover:bg-amber-600 text-amber-800 hover:text-white transition-all text-[11px] font-black flex items-center gap-1 cursor-pointer border border-amber-200 hover:border-amber-600 shadow-2xs group/btn active:scale-95"
                             >
                               <PowerOff className="w-3 h-3 group-hover/btn:rotate-12 transition-transform" />
                               <span>Tắt Thẻ</span>
@@ -561,7 +601,12 @@ export const EventsPage: React.FC = () => {
                   <div className="space-y-1.5 text-xs text-slate-600 pt-2 border-t border-slate-100">
                     <div className="flex items-start gap-1.5">
                       <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                      <span className="font-semibold text-slate-800">{evt.diaDiem} - <span className="font-normal text-slate-500">{evt.diaChi}</span></span>
+                      <span className="font-semibold text-slate-800">
+                        {evt.diaDiem}
+                        {evt.diaChi && evt.diaChi !== evt.diaDiem ? (
+                          <> - <span className="font-normal text-slate-500">{evt.diaChi}</span></>
+                        ) : null}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5 text-slate-600 font-medium">
                       <Clock className="w-4 h-4 text-slate-400 shrink-0" />
@@ -591,39 +636,46 @@ export const EventsPage: React.FC = () => {
 
                 </div>
 
-                {/* Nút Đặt lịch hoặc Trạng thái đã tắt */}
-                <div className="pt-2">
-                  {!isDismissed ? (
+                {/* Nút hành động phía dưới: Sửa và Xóa (Admin & Bác sĩ) */}
+                <div className="pt-2 border-t border-slate-100">
+                  {canManage ? (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditTarget(evt)}
+                        className="py-2.5 px-3 rounded-2xl bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white font-bold text-xs border border-blue-200/90 hover:border-blue-600 flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                        <span>Sửa</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(evt)}
+                        className="py-2.5 px-3 rounded-2xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white font-bold text-xs border border-rose-200/90 hover:border-rose-600 flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>Xóa</span>
+                      </button>
+                    </div>
+                  ) : !isDismissed ? (
                     <button
                       type="button"
                       onClick={() => handleOpenBooking(evt)}
                       className="w-full py-3 bg-blood-primary hover:bg-blood-dark text-white font-extrabold rounded-2xl shadow-md shadow-blood-primary/20 flex items-center justify-center gap-2 active:scale-98 transition-all text-xs cursor-pointer"
                     >
+                      <Heart className="w-4 h-4 fill-white" />
                       <span>Đăng Ký Tham Gia</span>
-                      <ArrowRight className="w-4 h-4" />
                     </button>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        disabled
-                        className="flex-1 py-3 bg-slate-200 text-slate-500 font-bold rounded-2xl flex items-center justify-center gap-2 text-xs cursor-not-allowed"
-                      >
-                        <Ban className="w-4 h-4 text-slate-400" />
-                        <span>Sự Kiện Đã Đóng</span>
-                      </button>
-                      {canDismiss && (
-                        <button
-                          type="button"
-                          onClick={() => handleConfirmRestore(evt)}
-                          title="Mở lại sự kiện"
-                          className="px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                          <span>Mở Lại</span>
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full py-3 bg-slate-200 text-slate-500 font-bold rounded-2xl flex items-center justify-center gap-2 text-xs cursor-not-allowed"
+                    >
+                      <Ban className="w-4 h-4 text-slate-400" />
+                      <span>Sự Kiện Đã Đóng</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -632,15 +684,15 @@ export const EventsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal đặt lịch hẹn */}
+      {/* Modal đặt lịch hẹn (Dành cho Người hiến) */}
       <BookModal
         event={selectedEvent}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
 
-      {/* Modal tạo sự kiện hiến máu mới (Chỉ dành cho Admin) */}
-      {user?.role === 'ADMIN' && (
+      {/* Modal tạo sự kiện hiến máu mới (Chỉ dành cho Admin & Bác sĩ) */}
+      {canManage && (
         <CreateEventModal
           isOpen={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
@@ -650,13 +702,37 @@ export const EventsPage: React.FC = () => {
         />
       )}
 
-      {/* Modal xác nhận tắt thẻ sự kiện hiến máu (Chỉ dành cho Admin) */}
-      <DismissEventModal
-        isOpen={Boolean(dismissTarget)}
-        event={dismissTarget}
-        onClose={() => setDismissTarget(null)}
-        onConfirm={handleConfirmDismiss}
-      />
+      {/* Modal chỉnh sửa sự kiện hiến máu (Chỉ dành cho Admin & Bác sĩ) */}
+      {canManage && (
+        <EditEventModal
+          isOpen={Boolean(editTarget)}
+          event={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSuccess={() => {
+            fetchEvents();
+          }}
+        />
+      )}
+
+      {/* Modal xác nhận xóa sự kiện hiến máu (Chỉ dành cho Admin & Bác sĩ) */}
+      {canManage && (
+        <DeleteEventModal
+          isOpen={Boolean(deleteTarget)}
+          event={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {/* Modal xác nhận tắt thẻ sự kiện hiến máu (Chỉ dành cho Admin & Bác sĩ) */}
+      {canManage && (
+        <DismissEventModal
+          isOpen={Boolean(dismissTarget)}
+          event={dismissTarget}
+          onClose={() => setDismissTarget(null)}
+          onConfirm={handleConfirmDismiss}
+        />
+      )}
 
     </div>
   );

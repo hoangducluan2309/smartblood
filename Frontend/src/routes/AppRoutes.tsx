@@ -72,6 +72,7 @@ export const AppRoutes: React.FC = () => {
         {/* 3. Tuyến đường cho Nhân viên Bệnh viện (HOSPITAL_STAFF & ADMIN) */}
         <Route path="staff" element={<ProtectedRoute allowedRoles={['HOSPITAL_STAFF', 'ADMIN']} />}>
           <Route path="reception" element={<ReceptionPage />} />
+          <Route path="events" element={<EventsPage />} />
           <Route path="emergency-request" element={<EmergencyRequestPage />} />
         </Route>
 
@@ -79,6 +80,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="admin" element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="events" element={<EventsPage />} />
           <Route path="inventory" element={<BloodInventoryPage />} />
           <Route path="dispatch" element={<DispatchPage />} />
           <Route path="forecast" element={<DemandForecastPage />} />

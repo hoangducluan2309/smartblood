@@ -659,7 +659,7 @@ paths:
     post:
       tags:
         - Donation Events
-      summary: Tạo sự kiện hiến máu mới (Chỉ Admin)
+      summary: Tạo sự kiện hiến máu mới (Admin & Bác sĩ)
       security:
         - BearerAuth: []
       requestBody:
@@ -695,7 +695,7 @@ paths:
     put:
       tags:
         - Donation Events
-      summary: Cập nhật thông tin sự kiện hiến máu (Chỉ Admin)
+      summary: Cập nhật thông tin sự kiện hiến máu (Admin & Bác sĩ)
       security:
         - BearerAuth: []
       parameters:
@@ -739,7 +739,7 @@ paths:
     delete:
       tags:
         - Donation Events
-      summary: Xóa sự kiện hiến máu (Chỉ Admin)
+      summary: Xóa sự kiện hiến máu (Admin & Bác sĩ)
       security:
         - BearerAuth: []
       parameters:
@@ -784,7 +784,7 @@ paths:
     put:
       tags:
         - Donation Events
-      summary: Đổi trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc - Chỉ Admin)
+      summary: Đổi trạng thái sự kiện hiến máu (Tắt / Khôi phục / Kết thúc - Admin & Bác sĩ)
       security:
         - BearerAuth: []
       parameters:

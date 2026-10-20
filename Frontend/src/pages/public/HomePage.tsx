@@ -138,33 +138,70 @@ const compatibility: Record<
   },
 };
 
-const upcomingEvents = [
+export interface HomePageEventCard {
+  id: string | number;
+  title: string;
+  location: string;
+  dateFormatted: string;
+  timeSlot: string;
+  registered: number;
+  capacity: number;
+  progress: number;
+  statusBadge: string;
+}
+
+const DAYS_OF_WEEK = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+const formatViDate = (date: Date): string => {
+  if (!Number.isFinite(date.getTime())) return 'Đang cập nhật';
+  const dayName = DAYS_OF_WEEK[date.getDay()] || 'Thứ Hai';
+  return `${dayName}, ${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+};
+
+const formatViTimeSlot = (start: Date, end: Date): string => {
+  if (!Number.isFinite(start.getTime())) return '08:00 - 11:30';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const startStr = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+  if (!Number.isFinite(end.getTime())) {
+    return startStr;
+  }
+  const endStr = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+  return `${startStr} - ${endStr}`;
+};
+
+const DEFAULT_HOME_EVENTS: HomePageEventCard[] = [
   {
-    title: 'Ngày Hội Giọt Hồng Tình Nguyện',
-    location: 'Nhà Văn hóa Thanh Niên, TP. Hồ Chí Minh',
-    daysFromNow: 2,
-    startHour: 8,
-    endHour: 11,
-    registered: 185,
-    capacity: 300,
-  },
-  {
-    title: 'Chuyến Xe Hiến Máu Lưu Động',
-    location: 'Trung tâm hiến máu nhân đạo',
-    daysFromNow: 4,
-    startHour: 8,
-    endHour: 12,
-    registered: 142,
+    id: 1,
+    title: 'Hành Trình Đỏ – Giọt Hồng Tình Nguyện 2028',
+    location: 'Nhà Văn Hóa Thanh Niên, Số 4 Phạm Ngọc Thạch, Bến Nghé, Quận 1, TP.HCM',
+    dateFormatted: 'Thứ Tư, 21 tháng 10, 2026',
+    timeSlot: '07:30 - 11:30',
+    registered: 0,
     capacity: 200,
+    progress: 0,
+    statusBadge: 'Sắp diễn ra',
   },
   {
-    title: 'Chiến Dịch Tiếp Máu Cứu Người',
-    location: 'Bệnh viện Đại học Y Dược',
-    daysFromNow: 6,
-    startHour: 7,
-    endHour: 13,
-    registered: 320,
-    capacity: 450,
+    id: 2,
+    title: 'Hành Trình Đỏ – Giọt Hồng Tình Nguyện 2026',
+    location: 'Nhà Văn Hóa Thanh Niên, Số 4 Phạm Ngọc Thạch, Bến Nghé, Quận 1, TP.HCM',
+    dateFormatted: 'Chủ Nhật, 25 tháng 10, 2026',
+    timeSlot: '15:54 - 23:54',
+    registered: 1,
+    capacity: 200,
+    progress: 1,
+    statusBadge: 'Sắp diễn ra',
+  },
+  {
+    id: 3,
+    title: 'Ngày Hội Hiến Máu Khẩn Cấp – Vì Bệnh Nhân Thalassemia',
+    location: 'Hội trường A - Bệnh viện Truyền máu Huyết học, 118 Hồng Bàng, Quận 5, TP.HCM',
+    dateFormatted: 'Chủ Nhật, 1 tháng 11, 2026',
+    timeSlot: '15:54 - 21:54',
+    registered: 0,
+    capacity: 150,
+    progress: 0,
+    statusBadge: 'Sắp diễn ra',
   },
 ];
 
@@ -198,6 +235,7 @@ export const HomePage: React.FC = () => {
   const [selectedBloodType, setSelectedBloodType] = useState('O+');
   const bloodInfo = compatibility[selectedBloodType];
   const [liveStats, setLiveStats] = useState<LiveHomeStats | null>(null);
+  const [homeEvents, setHomeEvents] = useState<HomePageEventCard[]>(DEFAULT_HOME_EVENTS);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(false);
   const [statsUpdatedAt, setStatsUpdatedAt] = useState<Date | null>(null);
@@ -207,53 +245,89 @@ export const HomePage: React.FC = () => {
 
     const refreshStats = async () => {
       try {
-        const [emergencyResponse, eventResponse] = await Promise.all([
+        const [emergencyRes, eventRes] = await Promise.allSettled([
           axiosClient.get('/emergency-requests/public'),
           axiosClient.get('/donation-events?limit=100'),
         ]);
 
-        const emergencyItems = emergencyResponse.data?.data;
-        const eventItems =
-          eventResponse.data?.data?.items ??
-          eventResponse.data?.items ??
-          eventResponse.data?.data;
+        const emergencyData = emergencyRes.status === 'fulfilled' ? emergencyRes.value.data : null;
+        const eventData = eventRes.status === 'fulfilled' ? eventRes.value.data : null;
 
-        if (
-          emergencyResponse.data?.success !== true ||
-          !Array.isArray(emergencyItems) ||
-          eventResponse.data?.success !== true ||
-          !Array.isArray(eventItems)
-        ) {
-          throw new Error('Dữ liệu thống kê từ máy chủ không hợp lệ.');
+        const emergencyItems = emergencyData?.data;
+        const eventItems =
+          eventData?.data?.items ??
+          eventData?.items ??
+          eventData?.data;
+
+        // Xử lý dữ liệu thống kê ca cấp cứu
+        let activeEmergencies: EmergencyStatsItem[] = [];
+        let criticalEmergencies: EmergencyStatsItem[] = [];
+        let requestedBloodUnits = 0;
+
+        if (Array.isArray(emergencyItems)) {
+          activeEmergencies = (emergencyItems as EmergencyStatsItem[]).filter(
+            (item) => item.trangThai === 'DangCho' || item.trangThai === 'DangDieuPhoi',
+          );
+          criticalEmergencies = activeEmergencies.filter(
+            (item) =>
+              item.mucDoKhanCap === 'NGUY_CAP' ||
+              item.mucDoKhanCap === 'RAT_KHAN',
+          );
+          requestedBloodUnits = activeEmergencies.reduce((total, item) => {
+            const units = Number(item.soLuongTui);
+            const milliliters = Number(item.soLuongCanMl);
+            return total + (units > 0 ? units : milliliters > 0 ? Math.ceil(milliliters / 350) : 0);
+          }, 0);
         }
 
-        const activeEmergencies = (emergencyItems as EmergencyStatsItem[]).filter(
-          (item) => item.trangThai === 'DangCho' || item.trangThai === 'DangDieuPhoi',
-        );
-        const criticalEmergencies = activeEmergencies.filter(
-          (item) =>
-            item.mucDoKhanCap === 'NGUY_CAP' ||
-            item.mucDoKhanCap === 'RAT_KHAN',
-        );
-        const requestedBloodUnits = activeEmergencies.reduce((total, item) => {
-          const units = Number(item.soLuongTui);
-          const milliliters = Number(item.soLuongCanMl);
-          return total + (units > 0 ? units : milliliters > 0 ? Math.ceil(milliliters / 350) : 0);
-        }, 0);
-        const now = Date.now();
-        const upcomingEventCount = (eventItems as DonationEventStatsItem[]).filter(
-          (item) => {
-            const startTime = item.thoiGianBatDau
-              ? new Date(item.thoiGianBatDau).getTime()
-              : Number.NaN;
-            return (
-              Number.isFinite(startTime) &&
-              startTime >= now &&
-              item.trangThai !== 'DaHuy' &&
-              item.trangThai !== 'KetThuc'
-            );
-          },
-        ).length;
+        // Xử lý và đồng bộ danh sách sự kiện từ database
+        let upcomingEventCount = 0;
+        if (Array.isArray(eventItems) && eventItems.length > 0) {
+          const activeList = (eventItems as any[]).filter(
+            (item) => item && item.trangThai !== 'DaHuy' && item.trangThai !== 'KetThuc'
+          );
+
+          upcomingEventCount = activeList.length;
+
+          // Sắp xếp sự kiện sắp tới theo ngày diễn ra gần nhất
+          activeList.sort((a, b) => {
+            const tA = a.thoiGianBatDau ? new Date(a.thoiGianBatDau).getTime() : 0;
+            const tB = b.thoiGianBatDau ? new Date(b.thoiGianBatDau).getTime() : 0;
+            return tA - tB;
+          });
+
+          const mapped: HomePageEventCard[] = activeList.slice(0, 6).map((item, idx) => {
+            const start = item.thoiGianBatDau ? new Date(item.thoiGianBatDau) : new Date();
+            const end = item.thoiGianKetThuc
+              ? new Date(item.thoiGianKetThuc)
+              : new Date(start.getTime() + 4 * 3600 * 1000);
+
+            const registered = Number(item.soLuongDaDangKy) || 0;
+            const capacity = Number(item.soLuongDuKien) || 100;
+            const progress = Math.min(100, Math.max(0, Math.round((registered / capacity) * 100)));
+
+            let statusBadge = 'Sắp diễn ra';
+            if (item.trangThai === 'DangDienRa') {
+              statusBadge = 'Đang diễn ra';
+            }
+
+            return {
+              id: item.id || idx + 1,
+              title: item.tenSuKien,
+              location: item.diaDiem || 'TP. Hồ Chí Minh',
+              dateFormatted: formatViDate(start),
+              timeSlot: formatViTimeSlot(start, end),
+              registered,
+              capacity,
+              progress,
+              statusBadge,
+            };
+          });
+
+          if (isMounted) {
+            setHomeEvents(mapped);
+          }
+        }
 
         if (isMounted) {
           setLiveStats({
@@ -580,43 +654,31 @@ export const HomePage: React.FC = () => {
           </Link>
         </div>
         <div className="grid grid-cols-1 gap-3.5 md:grid-cols-3">
-          {upcomingEvents.map((event) => {
-            const eventDate = new Date(
-              Date.now() + event.daysFromNow * 24 * 60 * 60 * 1000,
-            );
-            const progress = Math.round(
-              (event.registered / event.capacity) * 100,
-            );
+          {homeEvents.map((event) => {
             return (
               <article
-                key={event.title}
+                key={event.id}
                 className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-xs transition hover:border-rose-300 hover:shadow-md"
               >
                 <div>
                   <span className="rounded-full border border-rose-100 bg-rose-50 px-2.5 py-1 text-[10px] font-extrabold text-red-600">
-                    Sắp diễn ra
+                    {event.statusBadge}
                   </span>
-                  <h3 className="mt-2.5 font-extrabold leading-snug text-slate-900">
+                  <h3 className="mt-2.5 font-extrabold leading-snug text-slate-900 line-clamp-2">
                     {event.title}
                   </h3>
                   <div className="mt-2.5 space-y-1.5 text-xs text-slate-600">
                     <p className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 shrink-0 text-red-600" />
-                      {eventDate.toLocaleDateString('vi-VN', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
+                      <span>{event.dateFormatted}</span>
                     </p>
                     <p className="flex items-center gap-2">
                       <Clock className="h-4 w-4 shrink-0 text-slate-400" />
-                      {String(event.startHour).padStart(2, '0')}:00 -{' '}
-                      {String(event.endHour).padStart(2, '0')}:00
+                      <span>{event.timeSlot}</span>
                     </p>
                     <p className="flex items-start gap-2">
                       <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                      {event.location}
+                      <span className="line-clamp-2">{event.location}</span>
                     </p>
                   </div>
                 </div>
@@ -630,18 +692,18 @@ export const HomePage: React.FC = () => {
                   <div
                     className="h-2 overflow-hidden rounded-full bg-slate-100"
                     role="progressbar"
-                    aria-valuenow={progress}
+                    aria-valuenow={event.progress}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-label={`Đã đăng ký ${progress}%`}
+                    aria-label={`Đã đăng ký ${event.progress}%`}
                   >
                     <div
                       className="h-full rounded-full bg-gradient-to-r from-rose-400 to-red-600"
-                      style={{ width: `${progress}%` }}
+                      style={{ width: `${event.progress}%` }}
                     />
                   </div>
                   <Link
-                    to="/events"
+                    to={`/events?id=${event.id}`}
                     className="mt-2.5 inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700"
                   >
                     Đăng ký tham gia <ArrowRight className="h-3.5 w-3.5" />

@@ -343,15 +343,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5 text-[#D32F2F]" />
                   Tài khoản kiểm thử mẫu (Database Seed):
                 </p>
-                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600">
-                  <button
-                    type="button"
-                    onClick={() => setLoginForm({ email: 'donor1@hienmau.vn', matKhau: 'Password@123' })}
-                    className="p-1.5 bg-white border border-slate-200 rounded-lg text-left hover:border-red-300 hover:bg-red-50/30 transition-colors"
-                  >
-                    <span className="font-bold text-[#D32F2F] block">Tình nguyện viên</span>
-                    donor1@hienmau.vn
-                  </button>
+                <div className="grid grid-cols-3 gap-1.5 text-[10px] text-slate-600">
                   <button
                     type="button"
                     onClick={() => setLoginForm({ email: 'admin@hienmau.vn', matKhau: 'Password@123' })}
@@ -359,6 +351,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   >
                     <span className="font-bold text-purple-600 block">Quản trị viên</span>
                     admin@hienmau.vn
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ email: 'staff.choray@hienmau.vn', matKhau: 'Password@123' })}
+                    className="p-1.5 bg-white border border-slate-200 rounded-lg text-left hover:border-emerald-300 hover:bg-emerald-50/30 transition-colors"
+                  >
+                    <span className="font-bold text-emerald-600 block">Bác sĩ / Y tế</span>
+                    staff.choray@...
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginForm({ email: 'nguyenvanan.donor@gmail.com', matKhau: 'Password@123' })}
+                    className="p-1.5 bg-white border border-slate-200 rounded-lg text-left hover:border-red-300 hover:bg-red-50/30 transition-colors"
+                  >
+                    <span className="font-bold text-[#D32F2F] block">Người hiến máu</span>
+                    nguyenvanan...
                   </button>
                 </div>
               </div>
