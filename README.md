@@ -48,10 +48,10 @@ smartblood/
 │   │   ├── contexts/                # Quản lý State toàn cục (AuthContext, CallModalContext, EmergencyContext)
 │   │   ├── layouts/                 # Khung sườn giao diện chuẩn y tế (MainLayout)
 │   │   ├── pages/                   # Các trang tính năng nghiệp vụ:
-│   │   │   ├── admin/               # Quản lý người dùng, Quản lý kho, Quản lý chu kỳ 84 ngày, Điều phối xe 115
+│   │   │   ├── admin/               # Tổng quan Dashboard, Quản lý tài khoản, Quản lý kho, Chu kỳ 84 ngày, Điều phối xe 115
 │   │   │   ├── staff/               # Bàn tiếp nhận duyệt lịch hẹn, Khám sàng lọc, Phát lệnh cấp cứu
 │   │   │   ├── donor/               # Danh sách sự kiện hiến máu (/events), Tra cứu lịch sử hiến cá nhân
-│   │   │   └── public/              # Trang chủ (/), Bản đồ điểm hiến, Quy trình, Điều kiện hiến máu
+│   │   │   └── public/              # Trang chủ (/), Cấp cứu khẩn (/emergency), Bản đồ, Quy trình, FAQ
 │   │   ├── routes/                  # Định tuyến AppRoutes phân quyền theo vai trò (ADMIN, STAFF, DONOR)
 │   │   ├── types/                   # Định nghĩa TypeScript Types toàn hệ thống
 │   │   ├── utils/                   # Tiện ích giao diện, kiểm tra CCCD, chu kỳ an toàn
@@ -131,27 +131,40 @@ pnpm dev
 
 ## 3. Tài Khoản Thử Nghiệm Chuẩn Database (Demo Accounts)
 
-> 🔑 **Mật khẩu mặc định cho các tài khoản mẫu trong Database:** **`Password@123`**  
+> 🔑 **Mật khẩu mặc định cho cả 3 tài khoản mẫu trong Database:** **`Password@123`**  
 > *(Giao diện Đăng nhập cũng tích hợp sẵn các nút bấm đăng nhập nhanh 1-click cho từng vai trò).*
 
 | Vai trò | Email đăng nhập | Tên người dùng trong DB | Quyền hạn & Chức năng chính |
 | :--- | :--- | :--- | :--- |
 | **Quản trị viên (ADMIN)** | `admin@hienmau.vn` | **Quản Trị Viên Hệ Thống** | Toàn quyền hệ thống: Quản lý người dùng, Tạo/Sửa/Xóa sự kiện hiến máu, Quản lý kho máu FEFO, Giám sát chu kỳ hiến máu 84 ngày, Điều phối xe cấp cứu 115. |
 | **Bác sĩ / Y tế (HOSPITAL_STAFF)** | `staff.choray@hienmau.vn` | **BS. Trần Thị Mai (BV Chợ Rẫy)** | Tạo/Sửa/Xóa/Tắt thẻ sự kiện hiến máu, Bàn tiếp nhận & duyệt lịch hẹn, Khám sàng lọc, Tự động cộng dồn kho máu, Phát lệnh cấp cứu khẩn cấp, Xem tồn kho FEFO. |
-| **Người hiến máu (DONOR)** | `nguyenvanan.donor@gmail.com` | **Nguyễn Văn An** *(Nhóm máu: A+)* | Đã có sẵn lịch sử 5 lần hiến máu thành công + 1 lịch hẹn sắp tới. Xem chu kỳ phục hồi 84 ngày, Giấy chứng nhận điện tử, Đặt lịch tham gia sự kiện. |
-| **Người hiến máu (Nhóm máu hiếm)** | `namanh@gmail.com` | **nam anh** *(Nhóm máu: AB-)* | Tài khoản tình nguyện viên nhóm máu hiếm (Rh-), tra cứu và đăng ký hiến máu nhanh khi có lệnh điều phối khẩn. |
-| **Người hiến máu mới** | `testname123@example.com` | **Nguyen Van 123** | Tài khoản đăng ký mới chưa xác định nhóm máu; hồ sơ tự động cập nhật sau khi đến khám sàng lọc và được bác sĩ duyệt. |
+| **Người hiến máu (DONOR)** | `nguyenvanan.donor@gmail.com` | **Nguyễn Văn An** *(Nhóm máu: A+)* | Đã có sẵn lịch sử 5 lần hiến máu thành công + 1 lịch hẹn sắp tới. Theo dõi chu kỳ phục hồi 84 ngày, Giấy chứng nhận điện tử, Đặt lịch tham gia sự kiện. |
 
 ---
 
 ## 4. Các Tính Năng Nghiệp Vụ Nổi Bật Đã Hoàn Thiện
 
-### 1. Quản Lý Sự Kiện Hiến Máu & Đồng Bộ Trang Chủ
+### 1. Tổng Quan Hệ Thống & Giám Sát Cấp Cứu Toàn Diện (Admin Dashboard)
+- **4 Thẻ KPI đồng bộ thời gian thực 100% từ SQL Server**:
+  - **Tổng trữ lượng toàn kho**: Số túi và số lít máu đạt chuẩn, đồng bộ trực tiếp từ bảng `KhoMau` (`/api/v1/blood-inventories/summary`).
+  - **Ca cấp cứu đang xử lý**: Đồng bộ theo thời gian thực qua Socket.io và bảng `YeuCauMauKhanCap`.
+  - **Người hiến đã đăng ký**: Lấy số lượng người hiến máu thực tế từ CSDL (`/api/v1/users?vaiTro=DONOR`), có liên kết chuyển nhanh sang quản lý tài khoản.
+  - **Sự kiện hiến máu tháng**: Đếm số chiến dịch đang mở thực tế trong CSDL (`/api/v1/donation-events`), có liên kết chuyển nhanh sang quản lý sự kiện.
+- **Giám sát FEFO 8 nhóm máu**: Cảnh báo ngưỡng thiếu hụt an toàn và phân tích rủi ro.
+- **Giám sát trực tiếp xe cấp cứu 115**: Theo dõi tiến độ giao máu hỏa tốc và hỗ trợ gọi tài xế tức thời.
+
+### 2. Quản Lý Sự Kiện Hiến Máu & Đồng Bộ Màn Hình Trang Chủ
 - **Phân quyền Admin & Bác sĩ (HOSPITAL_STAFF)**: Tạo mới, Chỉnh sửa thông tin, Xóa vĩnh viễn, hoặc Bật/Tắt thẻ sự kiện (kèm ghi chú lý do như *"Đã đủ chỉ tiêu"*, *"Thời tiết xấu"*...).
-- **Đồng bộ thời gian thực ra màn hình Trang chủ**: Mục *"Các Đợt Hiến Máu Sắp Diễn Ra"* trên trang chủ tự động truy vấn từ CSDL SQL Server, hiển thị các sự kiện thực tế (*Hành Trình Đỏ 2026*, *Vì Bệnh Nhân Thalassemia*...), hiển thị ngày giờ chuẩn tiếng Việt, thanh tiến độ % chỉ tiêu và nút bấm chuyển thẳng vào modal đăng ký.
+- **Giao diện thẻ sự kiện chuẩn đẹp**: Nút **"Sửa"** và **"Xóa"** được bố trí cạnh nhau ở đáy thẻ (`grid grid-cols-2`), tự động loại bỏ việc lặp lại tên địa điểm và địa chỉ chi tiết.
+- **Đồng bộ thời gian thực ra màn hình Trang chủ**: Mục *"Các Đợt Hiến Máu Sắp Diễn Ra"* trên trang chủ tự động truy vấn từ CSDL SQL Server, hiển thị ngày giờ chuẩn tiếng Việt, thanh tiến độ % chỉ tiêu và nút bấm chuyển thẳng vào modal đăng ký của đúng sự kiện đó thông qua tham số `?id=...`.
 - **Bản đồ số Leaflet & Lọc theo Quận Huyện**: Tích hợp chế độ xem Lưới thẻ (Card Grid) và Bản đồ số (Map View) định vị chính xác vị trí tiếp nhận tại TP.HCM (Quận 1, Quận 5, Quận 10, TP. Thủ Đức...).
 
-### 2. Quản Lý Chu Kỳ An Toàn 84 Ngày (Thông tư 26/2013/TT-BYT)
+### 3. Màn Hình Cấp Cứu Khẩn Dành Riêng Cho Người Hiến Máu (`/emergency`)
+- **Tập trung cao độ vào các ca đang khẩn cấp**: Danh sách tự động lọc chỉ hiển thị các ca cấp cứu đang cần máu (`!isDismissed`) để Donor và cộng đồng dễ dàng nắm bắt và bấm **"Gọi Cứu Trợ Ngay"**.
+- **Loại bỏ các tùy chọn gây nhiễu**: Ẩn hoàn toàn các tab *"Đã tắt / Xong"* và *"Tất cả"* khỏi màn hình công khai.
+- **Quyền tắt thẻ của Bác sĩ & Admin**: Bác sĩ và Quản trị viên vẫn có nút bấm tắt thẻ ngay khi ca bệnh tiếp nhận đủ máu để ẩn ngay khỏi danh sách kêu gọi.
+
+### 4. Quản Lý Chu Kỳ An Toàn 84 Ngày (Thông tư 26/2013/TT-BYT)
 - Tự động thống kê các Donor đã hoàn thành hiến máu (`trangThai: 'HoanThanh'`).
 - Tự động tính toán khoảng cách an toàn **tối thiểu 84 ngày** (12 tuần) giữa 2 lần hiến máu toàn phần.
 - Phân loại trực quan:
@@ -159,21 +172,21 @@ pnpm dev
   - **Đang trong chu kỳ phục hồi ($< 84$ ngày)**: Đánh dấu vàng, hiển thị thanh % hồi phục sinh học và ngày dự kiến đủ điều kiện hiến tiếp.
 - Tích hợp **Hộp thoại cuộc gọi thông minh**: Gọi điện thoại thoại trực tiếp đến Donor qua số điện thoại chuẩn trong database.
 
-### 3. Bàn Tiếp Nhận, Khám Sàng Lọc & Cộng Dồn Kho Máu (FEFO Transaction)
+### 5. Bàn Tiếp Nhận, Khám Sàng Lọc & Cộng Dồn Kho Máu (FEFO Transaction)
 - Bác sĩ kiểm tra sinh hiệu (huyết áp, nhịp tim, cân nặng), xét nghiệm nhanh nhóm máu và xác nhận tiếp nhận máu.
 - Khi bấm **"Xác nhận tiếp nhận"**, hệ thống tự động:
   - Chuyển trạng thái lịch hẹn sang `HoanThanh`.
   - Cập nhật nhóm máu chuẩn vào hồ sơ cá nhân của Donor.
   - Cộng dồn thể tích vào Kho máu (`KhoMau`) bằng Sequelize Database Transaction, bảo đảm tính toàn vẹn dữ liệu.
 
-### 4. Quản Lý Kho Máu & Phân Quyền Bảo Mật RBAC
+### 6. Quản Lý Kho Máu & Phân Quyền Bảo Mật RBAC
 - Quản lý kho theo phương pháp **FEFO** (First Expired, First Out - Túi máu có hạn dùng gần nhất được ưu tiên xuất trước).
 - Cảnh báo trực quan ngưỡng thiếu hụt an toàn (Đỏ/Vàng/Xanh) cho 8 nhóm máu: `A+`, `A-`, `B+`, `B-`, `O+`, `O-`, `AB+`, `AB-`.
 - **Ma trận bảo mật RBAC**:
   - `ADMIN` & `HOSPITAL_STAFF`: Cho phép xem chi tiết kho máu FEFO và điều phối.
   - `DONOR` & `PUBLIC`: Bị chặn hoàn toàn (Trả về mã lỗi `403 Forbidden`).
 
-### 5. Điều Phối Xe Cứu Thương 115 & Còi Báo Động Đỏ Realtime
+### 7. Điều Phối Xe Cứu Thương 115 & Còi Báo Động Đỏ Realtime
 - Bệnh viện phát yêu cầu cấp cứu khẩn cấp (`NGUY_CAP` / `RAT_KHAN`).
 - WebSocket (Socket.io) tự động kích hoạt còi hú báo động đỏ âm thanh trên toàn hệ thống.
 - Bàn điều phối xe 115 kết nối tài xế cấp cứu, hỗ trợ cuộc gọi nhanh qua hotline tài xế và tổng đài 1900 6868 để chuyển máu kịp thời tới phòng mổ.

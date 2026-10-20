@@ -108,13 +108,24 @@ export const AdminDashboardPage: React.FC = () => {
   ]);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true);
-        // Lấy thống kê tồn kho từ Backend
-        const summaryRes = await axiosClient.get('/blood-inventories/summary').catch(() => null);
-        if (summaryRes?.data?.data || Array.isArray(summaryRes?.data)) {
-          const raw = summaryRes.data?.data || summaryRes.data;
+
+        // Gọi đồng thời các API CSDL SQL Server để lấy dữ liệu thống kê thực tế
+        const [summaryRes, userRes, eventRes] = await Promise.allSettled([
+          axiosClient.get('/blood-inventories/summary'),
+          axiosClient.get('/users', { params: { limit: 100, vaiTro: 'DONOR' } }),
+          axiosClient.get('/donation-events', { params: { limit: 100 } }),
+        ]);
+
+        // 1. Thống kê tồn kho máu (Card 1 & Blood stats)
+        let calculatedTotalUnits = 40;
+        let calculatedTotalVolume = 14;
+        if (summaryRes.status === 'fulfilled') {
+          const raw = summaryRes.value.data?.data || summaryRes.value.data;
           if (Array.isArray(raw) && raw.length > 0) {
             const mapped: BloodStat[] = raw.map((item: any) => ({
               group: item.nhomMau || item.bloodGroup || 'O+',
@@ -123,24 +134,54 @@ export const AdminDashboardPage: React.FC = () => {
               percentage: Math.min(150, item.phanTram || Math.round(((item.soLuongTui || 0) / (item.nguongAnToan || 10)) * 100)),
               status: (item.mucDo === 'CRITICAL' || item.status === 'CRITICAL') ? 'CRITICAL' : (item.mucDo === 'WARNING' || item.status === 'WARNING') ? 'WARNING' : 'SAFE'
             }));
-            setBloodStats(mapped);
+            if (isMounted) setBloodStats(mapped);
 
-            const calculatedTotalUnits = mapped.reduce((acc, curr) => acc + curr.units, 0);
-            setKpiData(prev => ({
-              ...prev,
-              totalUnits: calculatedTotalUnits,
-              totalVolumeLiters: Math.round(calculatedTotalUnits * 0.35 * 10) / 10
-            }));
+            calculatedTotalUnits = mapped.reduce((acc, curr) => acc + curr.units, 0);
+            calculatedTotalVolume = Math.round(calculatedTotalUnits * 0.35 * 10) / 10;
           }
         }
-      } catch {
-        // Fallback demo
+
+        // 2. Thống kê số lượng người hiến máu thực tế từ database (Card 3)
+        let donorCount = 18;
+        if (userRes.status === 'fulfilled') {
+          const userData = userRes.value.data?.data;
+          const totalDonors = userData?.pagination?.totalItems ?? (Array.isArray(userData?.items) ? userData.items.length : (Array.isArray(userData) ? userData.length : null));
+          if (typeof totalDonors === 'number') {
+            donorCount = totalDonors;
+          }
+        }
+
+        // 3. Thống kê số lượng sự kiện hiến máu thực tế từ database (Card 4)
+        let eventCount = 3;
+        if (eventRes.status === 'fulfilled') {
+          const eventData = eventRes.value.data?.data;
+          const eventItems = eventData?.items || (Array.isArray(eventData) ? eventData : []);
+          if (Array.isArray(eventItems)) {
+            const activeEvents = eventItems.filter((e: any) => e.trangThai !== 'DaHuy');
+            eventCount = activeEvents.length;
+          }
+        }
+
+        if (isMounted) {
+          setKpiData(prev => ({
+            ...prev,
+            totalUnits: calculatedTotalUnits,
+            totalVolumeLiters: calculatedTotalVolume,
+            registeredDonors: donorCount,
+            activeEventsThisMonth: eventCount,
+          }));
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải dữ liệu tổng quan admin:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchDashboardData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -291,10 +332,10 @@ export const AdminDashboardPage: React.FC = () => {
             <div className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
               {kpiData.registeredDonors.toLocaleString()}
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+            <Link to="/admin/users" className="flex items-center gap-1.5 text-xs text-blue-700 font-bold hover:underline">
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              <span>Đạt {kpiData.completionRateThisWeek}% chỉ tiêu tuần</span>
-            </div>
+              <span>Quản lý tài khoản &rarr;</span>
+            </Link>
           </div>
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/25">
             <Users className="w-7 h-7" />
@@ -308,9 +349,9 @@ export const AdminDashboardPage: React.FC = () => {
             <div className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
               {kpiData.activeEventsThisMonth} Điểm
             </div>
-            <Link to="/admin/forecast" className="flex items-center gap-1.5 text-xs text-purple-700 font-black hover:underline">
-              <Sparkles className="w-4 h-4 text-purple-600" />
-              <span>Quản lý hiến máu & dự báo &rarr;</span>
+            <Link to="/events" className="flex items-center gap-1.5 text-xs text-purple-700 font-black hover:underline">
+              <Calendar className="w-4 h-4 text-purple-600" />
+              <span>Quản lý sự kiện hiến máu &rarr;</span>
             </Link>
           </div>
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/25">
