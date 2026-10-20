@@ -11,7 +11,8 @@
     "build:frontend": "pnpm --prefix Frontend build",
     "build:backend": "pnpm --prefix Backend build",
     "build": "pnpm --prefix Frontend build && pnpm --prefix Backend build",
-    "install:all": "pnpm install && pnpm --prefix Backend install && pnpm --prefix Frontend install"
+    "install:all": "pnpm install && pnpm --prefix Backend install && pnpm --prefix Frontend install",
+    "test:e2e": "pnpm --prefix Backend test:e2e"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

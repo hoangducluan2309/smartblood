@@ -9,11 +9,12 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Tìm kiếm file đặc tả OpenAPI ở các vị trí khả dĩ
+// Tìm kiếm file đặc tả OpenAPI ở các vị trí khả dĩ (ưu tiên thư mục docs chuẩn ở gốc dự án)
 const possiblePaths = [
   path.resolve(process.cwd(), 'docs', 'openapi.yaml'),
+  path.resolve(__dirname, '../../../docs', 'openapi.yaml'),
+  path.resolve(process.cwd(), '..', 'docs', 'openapi.yaml'),
   path.resolve(__dirname, '../../docs', 'openapi.yaml'),
-  path.resolve(process.cwd(), 'Backend', 'docs', 'openapi.yaml'),
 ];
 
 let openApiPath = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
