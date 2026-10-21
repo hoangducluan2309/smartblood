@@ -124,7 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       toast.success(`Chào mừng trở lại, ${receivedUser.fullName || 'bạn'}!`);
-      return { token: receivedToken, user: receivedUser };
+      return { token: receivedToken, user: receivedUser, success: true };
     } catch (error: any) {
       let errorMsg = error.response?.data?.message;
       if (!errorMsg) {
@@ -174,7 +174,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       toast.success('Đăng ký tài khoản thành công!');
-      return { token: receivedToken, user: receivedUser };
+      return { token: receivedToken, user: receivedUser, success: true };
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || 'Đăng ký không thành công. Vui lòng thử lại!';
       toast.error(errorMsg);

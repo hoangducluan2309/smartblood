@@ -105,8 +105,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const result = await login(loginForm.email.trim(), loginForm.matKhau);
-      if (result.success) {
+      const result = await login({
+        email: loginForm.email.trim(),
+        matKhau: loginForm.matKhau,
+        password: loginForm.matKhau,
+      });
+      if (result.success || result.user || result.token) {
         setSuccessToast(`Đăng nhập thành công! Chào mừng ${result.user?.hoTen || 'bạn'}.`);
         setTimeout(() => {
           onClose();
@@ -115,8 +119,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       } else {
         setErrorMessage(result.message || 'Email hoặc mật khẩu không chính xác.');
       }
-    } catch {
-      setErrorMessage('Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại kết nối.');
+    } catch (err: any) {
+      setErrorMessage(
+        err?.response?.data?.message || 'Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại kết nối.'
+      );
     } finally {
       setIsSubmitting(false);
     }
