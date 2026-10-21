@@ -70,3 +70,24 @@ export function emitDonationAppointmentCreated(
 
   socketServer.to(APPOINTMENT_REVIEW_ROOM).emit('donation-appointment:created', appointment);
 }
+
+export interface DonationAppointmentUpdatedEvent {
+  id: number;
+  nguoiHienId?: number;
+  donorName?: string;
+  trangThai: string;
+  luongMauHienMl?: number;
+  nhomMau?: string;
+  updatedAt?: string;
+}
+
+export function emitDonationAppointmentUpdated(
+  eventData: DonationAppointmentUpdatedEvent
+): void {
+  if (!socketServer) return;
+  socketServer.to(APPOINTMENT_REVIEW_ROOM).emit('donation-appointment:updated', eventData);
+  if (eventData.trangThai === 'HoanThanh') {
+    socketServer.to(APPOINTMENT_REVIEW_ROOM).emit('donation-appointment:completed', eventData);
+  }
+}
+

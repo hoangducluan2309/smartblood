@@ -425,42 +425,44 @@ export class ForecastService {
    * Phân loại: Đủ điều kiện hiến tiếp (>= 84 ngày) hoặc Đang phục hồi (< 84 ngày kèm số ngày còn thiếu)
    */
   async thongKeDonorHienMauThanhCong(filterNhomMau?: string): Promise<DonorManagementStatsResponse> {
-    const whereUser: any = { vaiTro: 'DONOR' };
-    if (filterNhomMau && filterNhomMau !== 'ALL') {
-      whereUser.nhomMau = filterNhomMau;
-    }
-
-    const donors = await NguoiDung.findAll({
-      where: whereUser,
-      attributes: ['id', 'hoTen', 'email', 'soDienThoai', 'cccd', 'nhomMau', 'yeuToRh', 'diaChi', 'ngayTao'],
+    // 1. Truy vấn toàn bộ các lịch hẹn hiến máu ĐÃ HOÀN THÀNH từ database (Do nhân viên xác nhận tại Duyệt lịch hiến máu)
+    const completedAppointments = await LichHenHienMau.findAll({
+      where: {
+        trangThai: 'HoanThanh',
+      },
       include: [
         {
-          model: LichHenHienMau,
-          as: 'danhSachLichHen',
-          required: false,
-          include: [
-            {
-              model: SuKienHienMau,
-              as: 'suKien',
-              required: false,
-              attributes: ['id', 'tenSuKien', 'diaDiem'],
-            },
-          ],
+          model: NguoiDung,
+          as: 'nguoiHien',
+          attributes: ['id', 'hoTen', 'email', 'soDienThoai', 'cccd', 'nhomMau', 'yeuToRh', 'diaChi', 'vaiTro'],
+        },
+        {
+          model: SuKienHienMau,
+          as: 'suKien',
+          attributes: ['id', 'tenSuKien', 'diaDiem'],
         },
       ],
-      order: [['id', 'ASC']],
+      order: [['ngayHen', 'DESC']],
     });
 
     const now = new Date();
+    // 2. Nhóm các lần hiến thành công theo từng Người hiến (Donor)
+    const donorMap = new Map<number, { donor: NguoiDung; appointments: LichHenHienMau[] }>();
+
+    for (const app of completedAppointments) {
+      if (!app.nguoiHien || !app.nguoiHienId) continue;
+      const donorId = app.nguoiHienId;
+      if (!donorMap.has(donorId)) {
+        donorMap.set(donorId, { donor: app.nguoiHien, appointments: [] });
+      }
+      donorMap.get(donorId)!.appointments.push(app);
+    }
+
     const donorStats: DonorHistoryStat[] = [];
 
-    for (const donor of donors) {
-      const allAppointments = (donor as any).danhSachLichHen || [];
-      const completedApps = allAppointments.filter((a: any) => a.trangThai === 'HoanThanh');
-      if (completedApps.length === 0) continue;
-
-      completedApps.sort((a: any, b: any) => new Date(b.ngayHen).getTime() - new Date(a.ngayHen).getTime());
-      const lastApp = completedApps[0];
+    for (const [, { donor, appointments }] of donorMap.entries()) {
+      appointments.sort((a, b) => new Date(b.ngayHen).getTime() - new Date(a.ngayHen).getTime());
+      const lastApp = appointments[0];
       const lastDate = new Date(lastApp.ngayHen);
       const diffTime = now.getTime() - lastDate.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
@@ -468,7 +470,25 @@ export class ForecastService {
       const duDieuKien = soNgayDaQua >= 84;
       const soNgayConLai = duDieuKien ? 0 : 84 - soNgayDaQua;
       const ngayDuDieuKien = new Date(lastDate.getTime() + 84 * 24 * 60 * 60 * 1000);
-      const tongLuongMauMl = completedApps.reduce((acc: number, cur: any) => acc + (cur.luongMauHienMl || 350), 0);
+      const tongLuongMauMl = appointments.reduce((acc, cur) => acc + (cur.luongMauHienMl || 350), 0);
+
+      // Chuẩn hóa nhóm máu từ NguoiDung hoặc từ lịch hẹn đã được nhân viên duyệt
+      let bloodType = (donor.nhomMau || 'Chưa xác định').trim().toUpperCase();
+      const yeuToRh = donor.yeuToRh || 'Duong';
+      if (bloodType !== 'CHƯA XÁC ĐỊNH' && bloodType !== 'CHUA XAC DINH') {
+        if (!bloodType.includes('+') && !bloodType.includes('-')) {
+          const isNegative = yeuToRh.includes('-') || yeuToRh.toLowerCase().includes('am');
+          bloodType = `${bloodType}${isNegative ? '-' : '+'}`;
+        }
+      }
+
+      // Bộ lọc theo nhóm máu nếu người dùng chọn
+      if (filterNhomMau && filterNhomMau !== 'ALL') {
+        const cleanFilter = filterNhomMau.trim().toUpperCase();
+        if (bloodType !== cleanFilter) {
+          continue;
+        }
+      }
 
       let quanHuyen = 'Quận 1';
       const address = donor.diaChi || '';
@@ -477,22 +497,24 @@ export class ForecastService {
         quanHuyen = districtMatch[0].trim();
       }
 
+      const tenSuKienLanCuoi = lastApp.suKien?.tenSuKien || lastApp.ghiChu || 'Kho Lưu Trữ Trung Tâm - TP.HCM';
+
       donorStats.push({
         id: donor.id,
         hoTen: donor.hoTen,
         email: donor.email,
         soDienThoai: donor.soDienThoai,
         cccd: donor.cccd || `079${String(donor.id).padStart(9, '0')}`,
-        nhomMau: donor.nhomMau || 'Chưa xác định',
-        yeuToRh: donor.yeuToRh || 'Duong',
+        nhomMau: bloodType,
+        yeuToRh: bloodType.includes('-') || yeuToRh.toLowerCase().includes('am') ? 'Am' : 'Duong',
         diaChi: donor.diaChi || 'TP. Hồ Chí Minh',
         quanHuyen,
-        soLanDaHien: completedApps.length,
+        soLanDaHien: appointments.length,
         tongLuongMauMl,
         lanHienCuoi: lastDate.toLocaleDateString('vi-VN', { year: 'numeric', month: '2-digit', day: '2-digit' }),
         ngayHienCuoi: lastDate.toISOString(),
         luongMauLanCuoiMl: lastApp.luongMauHienMl || 350,
-        tenSuKienLanCuoi: lastApp.suKien?.tenSuKien || 'Trung Tâm Hiến Máu Nhân Đạo TP.HCM',
+        tenSuKienLanCuoi,
         soNgayDaQua,
         duDieuKien,
         soNgayConLai,
@@ -500,134 +522,6 @@ export class ForecastService {
         phanTramHoiPhuc: Math.min(100, Math.round((soNgayDaQua / 84) * 100)),
         trangThaiChuKy: duDieuKien ? 'DU_DIEU_KIEN' : 'DANG_PHUC_HOI',
       });
-    }
-
-    // Thêm các tình nguyện viên tham chiếu mẫu cho đa dạng nhóm máu (đặc biệt nhóm hiếm) nếu chưa trùng email/sđt
-    const seedReferenceDonors: DonorHistoryStat[] = [
-      {
-        id: 'REF-201',
-        hoTen: 'Nguyễn Văn Hùng',
-        email: 'hung.nguyen@example.com',
-        soDienThoai: '0912 345 678',
-        cccd: '079201000101',
-        nhomMau: 'O-',
-        yeuToRh: 'Am',
-        diaChi: '128 Nguyễn Trãi, Phường Bến Thành',
-        quanHuyen: 'Quận 1',
-        soLanDaHien: 6,
-        tongLuongMauMl: 2300,
-        lanHienCuoi: '20/11/2025',
-        ngayHienCuoi: '2025-11-20T08:30:00Z',
-        luongMauLanCuoiMl: 450,
-        tenSuKienLanCuoi: 'Ngày Hội Giọt Hồng Tình Nguyện',
-        soNgayDaQua: 140,
-        duDieuKien: true,
-        soNgayConLai: 0,
-        ngayDuDieuKienFormatted: '12/02/2026',
-        phanTramHoiPhuc: 100,
-        trangThaiChuKy: 'DU_DIEU_KIEN',
-      },
-      {
-        id: 'REF-202',
-        hoTen: 'Trần Thị Mai Phương',
-        email: 'phuong.tran@example.com',
-        soDienThoai: '0988 776 655',
-        cccd: '079201000102',
-        nhomMau: 'O-',
-        yeuToRh: 'Am',
-        diaChi: '45 Trần Hưng Đạo',
-        quanHuyen: 'Quận 5',
-        soLanDaHien: 4,
-        tongLuongMauMl: 1400,
-        lanHienCuoi: '10/12/2025',
-        ngayHienCuoi: '2025-12-10T09:00:00Z',
-        luongMauLanCuoiMl: 350,
-        tenSuKienLanCuoi: 'Hiến Máu Cứu Người - Quận 5',
-        soNgayDaQua: 120,
-        duDieuKien: true,
-        soNgayConLai: 0,
-        ngayDuDieuKienFormatted: '04/03/2026',
-        phanTramHoiPhuc: 100,
-        trangThaiChuKy: 'DU_DIEU_KIEN',
-      },
-      {
-        id: 'REF-203',
-        hoTen: 'Lê Hoàng Nam',
-        email: 'nam.le@example.com',
-        soDienThoai: '0903 112 233',
-        cccd: '079201000103',
-        nhomMau: 'A-',
-        yeuToRh: 'Am',
-        diaChi: '89 Cách Mạng Tháng 8',
-        quanHuyen: 'Quận 3',
-        soLanDaHien: 8,
-        tongLuongMauMl: 3100,
-        lanHienCuoi: '15/10/2025',
-        ngayHienCuoi: '2025-10-15T08:00:00Z',
-        luongMauLanCuoiMl: 450,
-        tenSuKienLanCuoi: 'Hành Trình Đỏ 2025',
-        soNgayDaQua: 176,
-        duDieuKien: true,
-        soNgayConLai: 0,
-        ngayDuDieuKienFormatted: '07/01/2026',
-        phanTramHoiPhuc: 100,
-        trangThaiChuKy: 'DU_DIEU_KIEN',
-      },
-      {
-        id: 'REF-204',
-        hoTen: 'Đỗ Thành Đạt',
-        email: 'dat.do@example.com',
-        soDienThoai: '0919 223 344',
-        cccd: '079201000104',
-        nhomMau: 'B-',
-        yeuToRh: 'Am',
-        diaChi: '56 Hoàng Văn Thụ',
-        quanHuyen: 'Phú Nhuận',
-        soLanDaHien: 3,
-        tongLuongMauMl: 1050,
-        lanHienCuoi: '01/10/2026',
-        ngayHienCuoi: '2026-10-01T08:30:00Z',
-        luongMauLanCuoiMl: 350,
-        tenSuKienLanCuoi: 'Tiếp Nhận Máu Cấp Cứu Phú Nhuận',
-        soNgayDaQua: 18,
-        duDieuKien: false,
-        soNgayConLai: 66,
-        ngayDuDieuKienFormatted: '24/12/2026',
-        phanTramHoiPhuc: 21,
-        trangThaiChuKy: 'DANG_PHUC_HOI',
-      },
-      {
-        id: 'REF-205',
-        hoTen: 'Phạm Thu Trang',
-        email: 'trang.pham@example.com',
-        soDienThoai: '0938 998 877',
-        cccd: '079201000105',
-        nhomMau: 'B-',
-        yeuToRh: 'Am',
-        diaChi: '204 Lê Văn Sỹ',
-        quanHuyen: 'Quận 3',
-        soLanDaHien: 5,
-        tongLuongMauMl: 1850,
-        lanHienCuoi: '15/09/2026',
-        ngayHienCuoi: '2026-09-15T09:00:00Z',
-        luongMauLanCuoiMl: 350,
-        tenSuKienLanCuoi: 'Hiến Máu Doanh Nhân Sài Gòn',
-        soNgayDaQua: 34,
-        duDieuKien: false,
-        soNgayConLai: 50,
-        ngayDuDieuKienFormatted: '08/12/2026',
-        phanTramHoiPhuc: 40,
-        trangThaiChuKy: 'DANG_PHUC_HOI',
-      },
-    ];
-
-    for (const seed of seedReferenceDonors) {
-      const exists = donorStats.some((d) => d.email === seed.email || d.soDienThoai === seed.soDienThoai);
-      if (!exists) {
-        if (!filterNhomMau || filterNhomMau === 'ALL' || seed.nhomMau === filterNhomMau) {
-          donorStats.push(seed);
-        }
-      }
     }
 
     // Sắp xếp: Ưu tiên người đủ điều kiện hiến tiếp lên trước, tiếp đến sắp xếp theo số ngày đã qua giảm dần
