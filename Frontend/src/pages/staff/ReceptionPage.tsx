@@ -233,6 +233,14 @@ export const ReceptionPage: React.FC = () => {
         { icon: '🩸', duration: 4000 }
       );
 
+      // Phát sự kiện đồng bộ cục bộ để menu Quản lý hiến máu (DemandForecastPage) tự động cập nhật ngay lập tức
+      try {
+        localStorage.setItem('bloodsmart_donor_completed_at', Date.now().toString());
+        window.dispatchEvent(new CustomEvent('bloodsmart:appointment-completed'));
+      } catch {
+        // Bỏ qua lỗi quota storage nếu có
+      }
+
       setIsCompleteModalOpen(false);
       setSelectedAppointment(null);
       await fetchAppointments();

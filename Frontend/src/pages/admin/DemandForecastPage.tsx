@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { io } from 'socket.io-client';
 import { axiosClient } from '../../api/axiosClient';
+import { useAuth } from '../../contexts/AuthContext';
 import { useCallModal } from '../../contexts/CallModalContext';
 import { 
   ShortageRiskForecast, 
@@ -266,6 +268,7 @@ type TabType = 'DONORS' | 'FORECAST';
 type EligibilityFilter = 'ALL' | 'ELIGIBLE' | 'RECOVERING';
 
 export const DemandForecastPage: React.FC = () => {
+  const { token } = useAuth();
   const { openCallModal } = useCallModal();
   
   // Navigation Tab
@@ -290,29 +293,21 @@ export const DemandForecastPage: React.FC = () => {
   const [donorSearchQuery, setDonorSearchQuery] = useState<string>('');
   const [eligibilityFilter, setEligibilityFilter] = useState<EligibilityFilter>('ALL');
 
-  // Gọi API lấy dữ liệu thực tế
-  const fetchData = async () => {
+  // Gọi API lấy dữ liệu thực tế từ Database
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // 1. Lấy danh sách thống kê Donor đã xác nhận hiến máu thành công & theo dõi chu kỳ 84 ngày
+      // 1. Lấy danh sách thống kê Donor đã xác nhận hiến máu thành công & theo dõi chu kỳ 84 ngày từ CSDL thật
       const donorRes = await axiosClient.get('/forecasts/donor-history-stats').catch(() => null);
       const donorData: DonorManagementStatsResponse = donorRes?.data?.data || donorRes?.data;
 
-      if (donorData && Array.isArray(donorData.danhSachDonors) && donorData.danhSachDonors.length > 0) {
+      if (donorData && Array.isArray(donorData.danhSachDonors)) {
         setDonorStatsList(donorData.danhSachDonors);
         setStatsSummary({
-          tongSoDonorDaHien: donorData.tongSoDonorDaHien || donorData.danhSachDonors.length,
-          soDonorDuDieuKien: donorData.soDonorDuDieuKien || donorData.danhSachDonors.filter(d => d.duDieuKien).length,
-          soDonorDangPhucHoi: donorData.soDonorDangPhucHoi || donorData.danhSachDonors.filter(d => !d.duDieuKien).length,
-          tongTheTichTiepNhanMl: donorData.tongTheTichTiepNhanMl || donorData.danhSachDonors.reduce((s, d) => s + d.tongLuongMauMl, 0),
-        });
-      } else {
-        setDonorStatsList(MOCK_DONOR_STATS_FALLBACK);
-        setStatsSummary({
-          tongSoDonorDaHien: MOCK_DONOR_STATS_FALLBACK.length,
-          soDonorDuDieuKien: MOCK_DONOR_STATS_FALLBACK.filter(d => d.duDieuKien).length,
-          soDonorDangPhucHoi: MOCK_DONOR_STATS_FALLBACK.filter(d => !d.duDieuKien).length,
-          tongTheTichTiepNhanMl: MOCK_DONOR_STATS_FALLBACK.reduce((s, d) => s + d.tongLuongMauMl, 0),
+          tongSoDonorDaHien: donorData.tongSoDonorDaHien ?? donorData.danhSachDonors.length,
+          soDonorDuDieuKien: donorData.soDonorDuDieuKien ?? donorData.danhSachDonors.filter(d => d.duDieuKien).length,
+          soDonorDangPhucHoi: donorData.soDonorDangPhucHoi ?? donorData.danhSachDonors.filter(d => !d.duDieuKien).length,
+          tongTheTichTiepNhanMl: donorData.tongTheTichTiepNhanMl ?? donorData.danhSachDonors.reduce((s, d) => s + (d.tongLuongMauMl || 0), 0),
         });
       }
 
@@ -340,22 +335,68 @@ export const DemandForecastPage: React.FC = () => {
         setForecasts(MOCK_FORECASTS);
       }
     } catch {
-      setDonorStatsList(MOCK_DONOR_STATS_FALLBACK);
+      // Không ghi đè danh sách bằng dữ liệu giả khi gặp lỗi
       setForecasts(MOCK_FORECASTS);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    void fetchData();
+  }, [fetchData]);
+
+  // Lắng nghe WebSocket thời gian thực khi nhân viên duyệt hoàn thành hiến máu tại menu Duyệt lịch
+  useEffect(() => {
+    if (!token) return;
+
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const socket = io(socketUrl, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
+    });
+
+    const handleSync = () => {
+      void fetchData();
+    };
+
+    socket.on('donation-appointment:completed', (eventData: any) => {
+      handleSync();
+      const donorName = eventData?.donorName ? `[${eventData.donorName}] ` : '';
+      toast.success(`Đã tự động đồng bộ Donor ${donorName}hoàn thành hiến máu từ Duyệt Lịch!`, {
+        icon: '🩸',
+        duration: 4000,
+      });
+    });
+
+    socket.on('donation-appointment:updated', handleSync);
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [token, fetchData]);
+
+  // Đồng bộ giữa các tab trình duyệt và khi cửa sổ được focus
+  useEffect(() => {
+    const handleLocalSync = () => {
+      void fetchData();
+    };
+    window.addEventListener('storage', handleLocalSync);
+    window.addEventListener('bloodsmart:appointment-completed', handleLocalSync);
+    window.addEventListener('focus', handleLocalSync);
+    return () => {
+      window.removeEventListener('storage', handleLocalSync);
+      window.removeEventListener('bloodsmart:appointment-completed', handleLocalSync);
+      window.removeEventListener('focus', handleLocalSync);
+    };
+  }, [fetchData]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
-    fetchData();
-    toast.success('Đã làm mới dữ liệu người hiến máu & mô hình dự báo!');
+    void fetchData();
+    toast.success('Đã làm mới dữ liệu người hiến máu & mô hình dự báo từ database!');
   };
 
   const handleBroadcastSMS = (donor: DonorHistoryStat) => {

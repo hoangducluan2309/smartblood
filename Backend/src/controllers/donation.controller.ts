@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { donationService } from '../services/donation.service.js';
-import { emitDonationAppointmentCreated } from '../utils/realtime.js';
+import { emitDonationAppointmentCreated, emitDonationAppointmentUpdated } from '../utils/realtime.js';
 import { AppError } from '../utils/AppError.js';
 
 export class DonationController {
@@ -100,6 +100,21 @@ export class DonationController {
       }
 
       const result = await donationService.capNhatKetQuaLichHen(lichHenId, req.body);
+
+      try {
+        emitDonationAppointmentUpdated({
+          id: result.id,
+          nguoiHienId: result.nguoiHienId,
+          donorName: (result as any).nguoiHien?.hoTen,
+          trangThai: result.trangThai,
+          luongMauHienMl: result.luongMauHienMl || undefined,
+          nhomMau: req.body.nhomMau,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('[Socket.IO]: Không thể phát sự kiện cập nhật lịch hẹn:', err);
+      }
+
       res.status(200).json({
         success: true,
         message: 'Cập nhật kết quả lịch hẹn và tồn kho thành công.',
