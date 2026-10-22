@@ -25,11 +25,11 @@ inventoryRouter.get(
   (req, res, next) => emergencyController.getInventories(req, res, next)
 );
 
-// Thêm mới túi máu vào kho (Admin)
+// Thêm mới túi máu vào kho (Admin & Hospital Staff / Bác Sĩ)
 inventoryRouter.post(
   '/',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   validateBody([
     Validators.required('nhomMau', 'Nhóm máu'),
     Validators.required('donViLuuTru', 'Đơn vị lưu trữ'),
@@ -38,19 +38,19 @@ inventoryRouter.post(
   (req, res, next) => emergencyController.createInventory(req, res, next)
 );
 
-// Cập nhật số lượng hoặc thông tin lưu trữ túi máu (Admin)
+// Cập nhật số lượng hoặc thông tin lưu trữ túi máu (Admin & Hospital Staff / Bác Sĩ)
 inventoryRouter.put(
   '/:id',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => emergencyController.updateInventory(req, res, next)
 );
 
-// Xuất hủy / Xóa túi máu khỏi kho (Admin)
+// Xuất hủy / Xóa túi máu khỏi kho (Admin & Hospital Staff / Bác Sĩ)
 inventoryRouter.delete(
   '/:id',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => emergencyController.deleteInventory(req, res, next)
 );
 
@@ -99,19 +99,19 @@ emergencyRouter.patch(
   (req, res, next) => emergencyController.updateDispatchStatus(req, res, next)
 );
 
-// Quản trị viên tạo lệnh điều phối xe cứu trợ & xuất kho trực tiếp (Admin)
+// Quản trị viên & Bác sĩ tạo lệnh điều phối xe cứu trợ & xuất kho trực tiếp (Admin & Hospital Staff)
 emergencyRouter.post(
   '/direct-dispatch',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => emergencyController.directDispatch(req, res, next)
 );
 
-// Quản trị viên điều phối xuất kho chi viện máu cho ca cấp cứu (Admin)
+// Quản trị viên & Bác sĩ điều phối xuất kho chi viện máu cho ca cấp cứu (Admin & Hospital Staff)
 emergencyRouter.post(
   '/:id/dispatch',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => emergencyController.dispatchRequest(req, res, next)
 );
 
@@ -143,11 +143,11 @@ emergencyRouter.patch(
   (req, res, next) => emergencyController.restoreRequest(req, res, next)
 );
 
-// Quản trị viên xóa vĩnh viễn yêu cầu cấp cứu (Admin)
+// Quản trị viên & Bác sĩ xóa vĩnh viễn yêu cầu cấp cứu (Admin & Hospital Staff)
 emergencyRouter.delete(
   '/:id',
   xacThucToken,
-  phanQuyen('ADMIN'),
+  phanQuyen('ADMIN', 'HOSPITAL_STAFF'),
   (req, res, next) => emergencyController.deleteRequest(req, res, next)
 );
 

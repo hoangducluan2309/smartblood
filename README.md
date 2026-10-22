@@ -102,7 +102,14 @@ File `.env` mẫu đã được cấu hình sẵn trong cả 2 thư mục:
   JWT_SECRET=your_super_secret_jwt_key_blood_donation_2026
   JWT_EXPIRES_IN=7d
   CORS_ORIGIN=http://localhost:3000
+
+  # Gmail SMTP Configuration (Cấp lại mật khẩu qua OTP 6 số)
+  # Đăng nhập Gmail -> Quản lý tài khoản Google -> Bảo mật -> Mật khẩu ứng dụng (App Password)
+  EMAIL_USER=your_gmail@gmail.com
+  EMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+  EMAIL_FROM="Hệ thống SMARTBLOOD" <your_gmail@gmail.com>
   ```
+  *(💡 **Lưu ý**: Nếu chưa cấu hình `EMAIL_USER`/`EMAIL_APP_PASSWORD`, hệ thống sẽ tự động kích hoạt cơ chế Fallback in mã OTP ra Terminal phục vụ chấm đồ án mà không báo lỗi).*
 * **Frontend/.env**:
   ```ini
   VITE_API_URL=http://localhost:5000/api/v1
@@ -126,6 +133,20 @@ pnpm dev
 *Nếu muốn chạy độc lập từng thư mục:*
 * **Backend:** `cd Backend && pnpm dev` (Chạy tại: `http://localhost:5000`)
 * **Frontend:** `cd Frontend && pnpm dev` (Chạy tại: `http://localhost:3000`)
+
+---
+
+### Bước 4: Khởi chạy bằng Docker (Không phụ thuộc môi trường máy cá nhân)
+
+Hệ thống đã được đóng gói sẵn **Docker Multi-Stage & Docker Compose** để triển khai trên bất kỳ máy chủ nào:
+
+```bash
+# Khởi chạy toàn bộ hệ thống (Database MSSQL + Backend + Frontend Nginx)
+docker compose up -d --build
+```
+- **Frontend Web UI**: `http://localhost:3000`
+- **Backend API & Swagger**: `http://localhost:5000/api-docs`
+- **Health Check**: `http://localhost:5000/api/health`
 
 ---
 
@@ -191,24 +212,49 @@ pnpm dev
 - WebSocket (Socket.io) tự động kích hoạt còi hú báo động đỏ âm thanh trên toàn hệ thống.
 - Bàn điều phối xe 115 kết nối tài xế cấp cứu, hỗ trợ cuộc gọi nhanh qua hotline tài xế và tổng đài 1900 6868 để chuyển máu kịp thời tới phòng mổ.
 
+### 8. An Ninh Đăng Nhập & Cơ Chế Khóa Tài Khoản 2 Giai Đoạn (Brute-Force Protection)
+- **Sai mật khẩu không cấp JWT**: Mọi yêu cầu đăng nhập sai mật khẩu hoặc tài khoản không tồn tại đều trả về lỗi `401 Unauthorized`, tuyệt đối **không cấp JWT Token**.
+- **Cơ chế Khóa 2 Giai đoạn Độc quyền**:
+  - **Giai đoạn 1 (Tạm khóa 3 phút)**: Nhập sai mật khẩu liên tiếp **5 lần**, hệ thống kích hoạt cơ chế tạm khóa tài khoản trong **3 phút**, có đồng hồ đếm ngược từng giây.
+  - **Giai đoạn 2 (Khóa luôn vào CSDL)**: Sau khi hết 3 phút tạm khóa, nếu người dùng tiếp tục nhập sai **3 lần nữa**, hệ thống sẽ **khóa luôn tài khoản vĩnh viễn** trực tiếp trong CSDL (`user.trangThai = 'Khoa'`). Mọi nỗ lực đăng nhập sau đó đều bị chặn với mã lỗi `403 Forbidden`.
+  - **Chỉ Admin mới có quyền mở lại**: Tài khoản bị khóa chỉ có thể được mở lại bởi tài khoản Quản trị viên (Admin).
+- **Đồng bộ thời gian thực vào Trang Quản Lý Tài Khoản Admin**:
+  - Huy hiệu trạng thái phân biệt rõ ràng:
+    - 🔴 **Bị Khóa (Chờ Admin mở)**: Dành cho tài khoản bị khóa vĩnh viễn trong CSDL.
+    - 🟡 **Tạm Khóa 3p (Còn Xp Ys)**: Dành cho tài khoản đang trong chu kỳ 3 phút tạm khóa.
+    - 🟢 **Hoạt Động**: Tài khoản hoạt động bình thường, kèm cảnh báo số lần nhập sai nếu có.
+  - Nút **Mở khóa nhanh (`Unlock`)**: Cho phép Admin mở khóa tài khoản ngay lập tức cho người dùng mà không cần chờ hết thời gian.
+- **Chống spam đăng ký hàng loạt**: Chặn hoàn toàn việc gửi mảng nhiều tài khoản trong 1 request (`400 Bad Request`).
+
 ---
 
 ## 5. Kiểm Thử Hệ Thống (Testing & API Docs)
 
-### Unit Tests
+### 1. Unit Tests (Logic Cốt Lõi)
 Dự án tích hợp bộ kiểm thử tự động kiểm tra các logic y tế cốt lõi:
 ```bash
 # Chạy bộ Unit Tests Backend
 pnpm --prefix Backend test
 ```
-*Kết quả:* **6/6 Tests Pass (100%)**:
-- Quy tắc ma trận tương thích nhóm máu truyền toàn phần (O- cho tất cả, AB+ nhận tất cả).
-- Quy tắc tương thích huyết tương (Plasma).
-- Lớp ngoại lệ `AppError` và chuẩn HTTP Status Codes.
-- Thuật toán phân trang (Pagination Helpers).
-- Cơ chế DTO Validation đầu vào.
-- Tính chu kỳ an toàn 84 ngày.
+*Kết quả:* **7/7 Tests Pass (100%)**:
+- **Test 1:** Quy tắc ma trận tương thích nhóm máu truyền toàn phần (O- cho tất cả, AB+ nhận tất cả).
+- **Test 2:** Quy tắc tương thích huyết tương (Plasma).
+- **Test 3:** Lớp ngoại lệ `AppError` và chuẩn HTTP Status Codes.
+- **Test 4:** Thuật toán phân trang (Pagination Helpers).
+- **Test 5:** Cơ chế DTO Validation đầu vào.
+- **Test 6:** Quy tắc khoảng cách an toàn 84 ngày giữa 2 lần hiến máu.
+- **Test 7:** Cơ chế LoginLimiter 2 giai đoạn (Tạm khóa 3 phút sau 5 lần sai, và khóa luôn sau 3 lần sai nữa).
 
-### Tài Liệu API Chuẩn OpenAPI / Swagger
+### 2. End-to-End Tests (E2E Integration Tests)
+Bộ kiểm thử tích hợp toàn diện 17 kịch bản vận hành thực tế qua HTTP Client trực tiếp:
+```bash
+# Chạy bộ kiểm thử E2E
+pnpm test:e2e
+```
+*Kết quả:* **17/17 Ca kiểm thử E2E Đạt Chuẩn (100% PASS)**:
+- Kiểm tra toàn diện vòng đời: Health Check, Đăng ký, Đăng nhập RBAC, Chặn vi phạm chu kỳ 84 ngày, Đặt lịch hiến máu, Xác nhận tiếp nhận cộng kho FEFO, Phát lệnh cấp cứu, Điều phối xuất kho FEFO gán xe 115, Quản lý sự kiện hiến máu, Đồng bộ Trang chủ, Toàn vẹn CSDL Kho Máu, An ninh đăng nhập sai mật khẩu 401 không cấp JWT, **Tự động khóa 2 giai đoạn (3 phút & Khóa luôn CSDL)**, và Chống spam đăng ký mảng.
+- Báo cáo chi tiết xem tại: [`docs/test-results.md`](file:///c:/smartblood/docs/test-results.md)
+
+### 3. Tài Liệu API Chuẩn OpenAPI / Swagger
 - Truy cập Swagger UI trực tiếp tại: **[http://localhost:5000/api-docs](http://localhost:5000/api-docs)**
 - File đặc tả OpenAPI chuẩn: `docs/openapi.yaml`

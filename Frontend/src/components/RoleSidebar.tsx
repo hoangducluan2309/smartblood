@@ -28,7 +28,7 @@ interface SidebarItem {
 
 const roleLabels: Record<UserRole, string> = {
   ADMIN: 'Quản trị hệ thống',
-  HOSPITAL_STAFF: 'Nhân viên y tế',
+  HOSPITAL_STAFF: 'Bác sĩ / Nhân viên y tế',
   DONOR: 'Người hiến máu',
 };
 
@@ -43,7 +43,9 @@ const roleItems: Record<UserRole, SidebarItem[]> = {
     { label: 'Tiếp nhận & duyệt lịch', path: '/staff/reception', icon: ClipboardCheck },
     { label: 'Sự kiện hiến máu', path: '/events', icon: CalendarCheck },
     { label: 'Phát lệnh cấp cứu', path: '/staff/emergency-request', icon: ShieldAlert },
-    { label: 'Kho dự trữ máu', path: '/inventory', icon: Package },
+    { label: 'Điều phối xe 115', path: '/admin/dispatch', icon: Ambulance },
+    { label: 'Quản lý kho máu', path: '/admin/inventory', icon: Package },
+    { label: 'Quản lý hiến máu', path: '/admin/forecast', icon: BarChart3 },
     { label: 'Hồ sơ cá nhân', path: '/profile', icon: CircleUserRound },
   ],
   ADMIN: [
@@ -91,10 +93,10 @@ export const RoleSidebar: React.FC = () => {
             <Droplet className="h-6 w-6 fill-white text-white" />
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-black tracking-wide text-white">BLOODSMART</span>
+            <span className="block text-sm font-black tracking-wide text-white">SMARTBLOOD</span>
             <span className="mt-1 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.13em] text-rose-300">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-              {role === 'ADMIN' ? 'Điều phối hệ thống' : role === 'HOSPITAL_STAFF' ? 'Tiếp nhận hiến máu' : 'Cộng đồng hiến máu'}
+              {role === 'ADMIN' ? 'Điều phối hệ thống' : role === 'HOSPITAL_STAFF' ? 'Bác sĩ điều phối' : 'Cộng đồng hiến máu'}
             </span>
           </span>
         </Link>

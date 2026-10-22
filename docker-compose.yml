@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # 1. Cơ sở dữ liệu Microsoft SQL Server (Chạy độc lập trên container)
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: smartblood-db
+    restart: always
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=HienMau@2026!
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql-data:/var/opt/mssql/data
+      - ./Backend/sql:/docker-entrypoint-initdb.d
+    networks:
+      - smartblood-network
+
+  # 2. Máy chủ Backend API (Node.js + Express + TypeScript)
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: smartblood-backend
+    restart: always
+    depends_on:
+      - database
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - DB_HOST=database
+      - DB_PORT=1433
+      - DB_NAME=HienMauDB
+      - DB_USER=sa
+      - DB_PASSWORD=HienMau@2026!
+      - DB_ENCRYPT=false
+      - DB_TRUST_SERVER_CERTIFICATE=true
+      - JWT_SECRET=your_super_secret_jwt_key_blood_donation_2026
+      - CORS_ORIGIN=*
+    ports:
+      - "5000:5000"
+    networks:
+      - smartblood-network
+
+  # 3. Ứng dụng Giao diện Frontend Web (React 19 + Nginx)
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: smartblood-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    networks:
+      - smartblood-network
+
+volumes:
+  mssql-data:
+
+networks:
+  smartblood-network:
+    driver: bridge

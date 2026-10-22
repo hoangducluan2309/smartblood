@@ -6,6 +6,7 @@ import { hashPassword } from '../utils/password.util.js';
 import { getPasswordPolicyError } from '../utils/passwordPolicy.js';
 import { AppError } from '../utils/AppError.js';
 import { parsePaginationParams, buildPaginatedResponse } from '../dtos/pagination.dto.js';
+import { loginLimiter } from './loginLimiter.service.js';
 
 export interface UserQueryDTO {
   page?: number | string;
@@ -80,7 +81,17 @@ export class UserService {
       offset,
     });
 
-    return buildPaginatedResponse(rows, count, page, limit);
+    const items = rows.map((u) => {
+      const uJson = u.toJSON() as any;
+      const lockInfo = loginLimiter.checkLockout(u.email);
+      uJson.dangTamKhoa = lockInfo.isLocked;
+      uJson.tamKhoaPhut = lockInfo.remainingMinutes;
+      uJson.tamKhoaGiay = lockInfo.remainingSeconds;
+      uJson.soLanNhapSai = lockInfo.hasBeenTempLocked ? 5 + lockInfo.postLockoutAttempts : lockInfo.failedAttempts;
+      return uJson;
+    });
+
+    return buildPaginatedResponse(items, count, page, limit);
   }
 
   /**
@@ -183,7 +194,12 @@ export class UserService {
 
     if (data.hoTen) user.hoTen = data.hoTen.trim();
     if (data.vaiTro) user.vaiTro = data.vaiTro;
-    if (data.trangThai) user.trangThai = data.trangThai;
+    if (data.trangThai) {
+      user.trangThai = data.trangThai;
+      if (data.trangThai === 'HoatDong') {
+        loginLimiter.resetAttempts(user.email);
+      }
+    }
     if (data.diaChi !== undefined) user.diaChi = data.diaChi ? data.diaChi.trim() : null;
 
     if (data.nhomMau !== undefined) {
@@ -230,10 +246,12 @@ export class UserService {
 
     user.matKhauHash = await hashPassword(matKhauMoi);
     await user.save();
+    // Đặt lại số lần sai và mở khóa tạm thời nếu có
+    loginLimiter.resetAttempts(user.email);
   }
 
   /**
-   * 5. Khóa hoặc Mở khóa nhanh tài khoản
+   * 5. Khóa hoặc Mở khóa tài khoản (Chỉ Admin mới có quyền thực hiện)
    */
   async thayDoiTrangThai(id: number, currentUserId: number): Promise<{ id: number; trangThai: string; message: string }> {
     if (id === currentUserId) {
@@ -243,10 +261,34 @@ export class UserService {
     const user = await NguoiDung.findByPk(id);
     if (!user) throw AppError.notFound('Không tìm thấy tài khoản người dùng.');
 
-    user.trangThai = user.trangThai === 'HoatDong' ? 'Khoa' : 'HoatDong';
+    const isTempLocked = loginLimiter.checkLockout(user.email).isLocked;
+
+    // Nếu tài khoản đang ở trạng thái HoatDong nhưng đang bị tạm khóa 3 phút do nhập sai
+    // -> Admin có thể bấm mở khóa ngay lập tức mà không cần chờ hết 3 phút
+    if (user.trangThai === 'HoatDong' && isTempLocked) {
+      loginLimiter.resetAttempts(user.email);
+      return {
+        id: user.id,
+        trangThai: user.trangThai,
+        message: `Đã gỡ tạm khóa thành công cho tài khoản [${user.hoTen}]. Người dùng có thể đăng nhập lại ngay bây giờ.`,
+      };
+    }
+
+    const newStatus = user.trangThai === 'HoatDong' ? 'Khoa' : 'HoatDong';
+    user.trangThai = newStatus;
     await user.save();
 
-    return { id: user.id, trangThai: user.trangThai, message: `Đã đổi trạng thái tài khoản thành: ${user.trangThai}` };
+    // Nếu Admin mở khóa tài khoản -> Xóa hoàn toàn trạng thái khóa trong bộ nhớ
+    if (newStatus === 'HoatDong') {
+      loginLimiter.resetAttempts(user.email);
+    }
+
+    const actionText = newStatus === 'HoatDong' ? 'Mở khóa' : 'Khóa';
+    return {
+      id: user.id,
+      trangThai: user.trangThai,
+      message: `${actionText} tài khoản [${user.hoTen}] thành công.`,
+    };
   }
 
   /**

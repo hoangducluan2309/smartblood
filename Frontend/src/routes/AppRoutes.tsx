@@ -76,16 +76,23 @@ export const AppRoutes: React.FC = () => {
           <Route path="emergency-request" element={<EmergencyRequestPage />} />
         </Route>
 
-        {/* 4. Tuyến đường Quản trị tối cao (ADMIN) */}
-        <Route path="admin" element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-          <Route index element={<AdminDashboardPage />} />
-          <Route path="dashboard" element={<AdminDashboardPage />} />
-          <Route path="events" element={<EventsPage />} />
-          <Route path="inventory" element={<BloodInventoryPage />} />
-          <Route path="dispatch" element={<DispatchPage />} />
-          <Route path="forecast" element={<DemandForecastPage />} />
-          <Route path="appointments" element={<ReceptionPage />} />
-          <Route path="users" element={<UserManagementPage />} />
+        {/* 4. Tuyến đường Quản trị & Điều hành Y tế (ADMIN & HOSPITAL_STAFF) */}
+        <Route path="admin">
+          {/* Các chức năng Bác sĩ và Quản trị viên cùng có quyền quản lý: Điều phối xe 115, Quản lý kho máu, Quản lý hiến máu */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'HOSPITAL_STAFF']} />}>
+            <Route path="dispatch" element={<DispatchPage />} />
+            <Route path="inventory" element={<BloodInventoryPage />} />
+            <Route path="forecast" element={<DemandForecastPage />} />
+            <Route path="events" element={<EventsPage />} />
+            <Route path="appointments" element={<ReceptionPage />} />
+          </Route>
+
+          {/* Các chức năng chỉ dành riêng cho Quản trị viên tối cao (ADMIN) */}
+          <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+            <Route index element={<AdminDashboardPage />} />
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="users" element={<UserManagementPage />} />
+          </Route>
         </Route>
 
         {/* Fallback 404 Route */}

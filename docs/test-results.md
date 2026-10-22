@@ -13,7 +13,7 @@
 
 | Tổng số ca kiểm thử | Số ca Thành công (PASS) | Số ca Thất bại (FAIL) | Thời gian chạy trung bình | Tỷ lệ Đạt (Pass Rate) |
 | :---: | :---: | :---: | :---: | :---: |
-| **13** | **13** | **0** | **~750 ms** | **100%** |
+| **17** | **17** | **0** | **~1.5 s** | **100%** |
 
 ```text
 ================================================================
@@ -21,25 +21,29 @@
 📡 Mục tiêu API: http://localhost:5000/api/v1
 ================================================================
 
-  ✅ [PASS] T00: Kiểm tra trạng thái hoạt động của Backend Server (43ms)
-  ✅ [PASS] T01: Đăng ký tài khoản người hiến máu (Donor) mới (85ms)
-  ✅ [PASS] T02: Đăng nhập cấp JWT Token chuẩn cho từng vai trò (315ms)
-  ✅ [PASS] T03: Chặn đặt lịch khi chưa đủ khoảng cách an toàn 84 ngày (31ms)
+  ✅ [PASS] T00: Kiểm tra trạng thái hoạt động của Backend Server (44ms)
+  ✅ [PASS] T01: Đăng ký tài khoản người hiến máu (Donor) mới (121ms)
+  ✅ [PASS] T02: Đăng nhập cấp JWT Token chuẩn cho từng vai trò (342ms)
+  ✅ [PASS] T03: Chặn đặt lịch khi chưa đủ khoảng cách an toàn 84 ngày (32ms)
   ✅ [PASS] T04: Tình nguyện viên đặt lịch hẹn hiến máu hợp lệ (12ms)
-  ✅ [PASS] T05: Bác sĩ xác nhận tiếp nhận máu và cộng dồn kho FEFO (23ms)
-  ✅ [PASS] T06: Bác sĩ / Bệnh viện tạo yêu cầu cấp cứu máu hỏa tốc (18ms)
-  ✅ [PASS] T07: Admin điều phối xuất kho FEFO và gán xe cứu thương 115 (29ms)
-  ✅ [PASS] T08: Kiểm tra bảo mật RBAC: Chặn Donor truy cập tài nguyên quản trị (45ms)
-  ✅ [PASS] T09: Bác sĩ & Admin quản lý vòng đời sự kiện hiến máu (67ms)
-  ✅ [PASS] T10: Đồng bộ danh sách sự kiện hiến máu công khai ra Trang chủ (12ms)
-  ✅ [PASS] T11: Lấy danh sách ca cấp cứu công khai dành cho Trang chủ & Donor (16ms)
-  ✅ [PASS] T12: Kiểm tra tính toàn vẹn và nhất quán của CSDL Kho Máu (13ms)
+  ✅ [PASS] T05: Bác sĩ xác nhận tiếp nhận máu và cộng dồn kho FEFO (21ms)
+  ✅ [PASS] T06: Bác sĩ / Bệnh viện tạo yêu cầu cấp cứu máu hỏa tốc (22ms)
+  ✅ [PASS] T07: Admin điều phối xuất kho FEFO và gán xe cứu thương 115 (28ms)
+  ✅ [PASS] T08: Kiểm tra bảo mật RBAC: Chặn Donor truy cập tài nguyên quản trị (44ms)
+  ✅ [PASS] T09: Bác sĩ & Admin quản lý vòng đời sự kiện hiến máu (65ms)
+  ✅ [PASS] T10: Đồng bộ danh sách sự kiện hiến máu công khai ra Trang chủ (13ms)
+  ✅ [PASS] T11: Lấy danh sách ca cấp cứu công khai dành cho Trang chủ & Donor (6ms)
+  ✅ [PASS] T12: Kiểm tra tính toàn vẹn và nhất quán của CSDL Kho Máu (6ms)
+  ✅ [PASS] T13: Đăng nhập sai mật khẩu: Trả về lỗi 401 & KHÔNG cấp JWT (84ms)
+  ✅ [PASS] T14: Nhập sai mật khẩu liên tiếp 5 lần: Tạm khóa 3 phút, hiển thị trong CSDL Admin và Admin mở lại được (641ms)
+  ✅ [PASS] T15: Tài khoản không tồn tại: Trả về lỗi 401 & KHÔNG cấp JWT (14ms)
+  ✅ [PASS] T16: Chặn gửi mảng / nhiều tài khoản cùng 1 request: Trả về 400 Bad Request (13ms)
 
 ================================================================
 📊 KẾT QUẢ TỔNG HỢP KIỂM THỬ END-TO-END (E2E)
 ================================================================
-- Tổng số ca kiểm thử: 13
-- Thành công (PASS):   13
+- Tổng số ca kiểm thử: 17
+- Thành công (PASS):   17
 - Thất bại (FAIL):     0
 - Tỷ lệ Đạt:           100%
 ================================================================
@@ -48,7 +52,7 @@
 
 ---
 
-## 2. BẢNG CHI TIẾT 13 CA KIỂM THỬ E2E (DETAILED E2E TEST MATRIX)
+## 2. BẢNG CHI TIẾT 17 CA KIỂM THỬ E2E (DETAILED E2E TEST MATRIX)
 
 | Mã Test | Tên Ca Kiểm Thử | Endpoint / Method | Dữ Liệu Thử Nghiệm & Ràng Buộc | Kết Quả Kỳ Vọng | Kết Quả Thực Tế | Trạng Thái |
 | :--- | :--- | :--- | :--- | :--- | :--- | :---: |
@@ -65,6 +69,10 @@
 | **T10** | Đồng bộ sự kiện hiến máu ra Trang chủ | `GET /api/v1/donation-events` | Khách vãng lai truy vấn danh sách sự kiện hiển thị công khai ở Trang chủ | HTTP 200 OK; Danh sách dạng mảng, có ít nhất 1 sự kiện hoạt động | HTTP 200 OK; Đồng bộ 100% với dữ liệu SQL Server | **PASS** |
 | **T11** | Danh sách ca cấp cứu công khai cho Donor | `GET /api/v1/emergency-requests/public` | Khách vãng lai và Donor truy vấn các ca cấp cứu để kịp thời chi viện | HTTP 200 OK; Trả về danh sách ca cấp cứu, bao gồm các ca đang mở (`DangCho`, `DangDieuPhoi`) | HTTP 200 OK; Dữ liệu sẵn sàng phục vụ Donor theo thời gian thực | **PASS** |
 | **T12** | Kiểm tra toàn vẹn CSDL Kho Máu (Integrity) | `GET /api/v1/blood-inventories/summary` | Admin tổng hợp trữ lượng 8 nhóm máu (O+, O-, A+, A-, B+, B-, AB+, AB-) | HTTP 200 OK; Trả về mảng đủ các nhóm máu với số lượng khả dụng và ngưỡng an toàn | HTTP 200 OK; Trữ lượng tồn kho nhất quán và toàn vẹn | **PASS** |
+| **T13** | Sai mật khẩu: Trả về lỗi 401 & KHÔNG cấp JWT | `POST /api/v1/auth/login` | Nhập sai mật khẩu tài khoản Admin | HTTP 401 Unauthorized; Tuyệt đối không cấp JWT Token; Trả về thông báo lỗi mật khẩu không chính xác | HTTP 401 Unauthorized; Chặn cấp token thành công | **PASS** |
+| **T14** | Tự động khóa 2 giai đoạn (Tạm khóa 3 phút & Khóa luôn CSDL sau 3 lần sai nữa) | `POST /api/v1/auth/login`, `GET /users`, `PUT /users/:id/status` | Nhập sai liên tiếp 5 lần -> Tạm khóa 3 phút; Hiển thị cờ `dangTamKhoa` và thời gian đếm ngược trong trang Quản trị Admin; Admin bấm mở khóa hoặc khóa luôn trong CSDL | HTTP 401 Unauthorized; Tạm khóa 3 phút; Đồng bộ trạng thái vào CSDL; Admin có toàn quyền mở khóa lại | HTTP 401/403/200; Quy trình bảo mật 2 giai đoạn và đồng bộ CSDL Quản lý Admin hoàn tất 100% | **PASS** |
+| **T15** | Tài khoản không tồn tại trong hệ thống | `POST /api/v1/auth/login` | Nhập email không tồn tại trong CSDL | HTTP 401 Unauthorized; Không cấp JWT Token; Thông báo lỗi an toàn | HTTP 401 Unauthorized; Bảo vệ chống thu thập thông tin tài khoản | **PASS** |
+| **T16** | Chống spam đăng ký hàng loạt (Batch Register) | `POST /api/v1/auth/register` | Gửi payload dạng mảng chứa nhiều tài khoản trong 1 request | HTTP 400 Bad Request; Chặn chỉ cho phép tạo 1 tài khoản duy nhất cho mỗi yêu cầu | HTTP 400 Bad Request; Chống lạm dụng tài nguyên thành công | **PASS** |
 
 ---
 
@@ -83,7 +91,7 @@ cd Backend
 pnpm test:e2e
 ```
 
-Script sẽ tự động khởi tạo dữ liệu giả lập chuẩn, thực hiện tuần tự 13 kịch bản thực tế qua HTTP Client, kiểm tra các điều kiện khẳng định (assertions), và in báo cáo tóm tắt trên terminal.
+Script sẽ tự động khởi tạo dữ liệu giả lập chuẩn, thực hiện tuần tự 17 kịch bản thực tế qua HTTP Client, kiểm tra các điều kiện khẳng định (assertions), và in báo cáo tóm tắt trên terminal.
 
 ---
 
