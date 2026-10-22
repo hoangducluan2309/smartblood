@@ -3,9 +3,9 @@
 - **Dự án**: Hệ thống Điều phối Hiến máu Nhân đạo & Dự báo Nhu cầu Máu Y tế SmartBlood
 - **Môi trường thử nghiệm**: Live Running Server (`http://localhost:5000/api/v1`) kết nối Microsoft SQL Server (`HienMauDB`)
 - **Bộ kiểm thử**: Automated E2E Runner (`Backend/src/scripts/run-e2e-tests.ts`) qua lệnh `pnpm test:e2e`
-- **Công nghệ**: TypeScript, tsx, Node.js fetch, Sequelize ORM, SQL Server, JWT, Bcrypt
-- **Thời gian thực hiện**: 20/10/2026
-- **Trạng thái thực thi**: **13/13 Ca kiểm thử THÀNH CÔNG (100% PASS)**
+- **Công nghệ**: TypeScript, tsx, Node.js fetch, Sequelize ORM, SQL Server, JWT, Bcrypt, Nodemailer
+- **Thời gian thực hiện**: 22/10/2026
+- **Trạng thái thực thi**: **19/19 Ca kiểm thử THÀNH CÔNG (100% PASS)**
 
 ---
 
@@ -13,7 +13,7 @@
 
 | Tổng số ca kiểm thử | Số ca Thành công (PASS) | Số ca Thất bại (FAIL) | Thời gian chạy trung bình | Tỷ lệ Đạt (Pass Rate) |
 | :---: | :---: | :---: | :---: | :---: |
-| **17** | **17** | **0** | **~1.5 s** | **100%** |
+| **19** | **19** | **0** | **~3.5 s** | **100%** |
 
 ```text
 ================================================================
@@ -21,29 +21,31 @@
 📡 Mục tiêu API: http://localhost:5000/api/v1
 ================================================================
 
-  ✅ [PASS] T00: Kiểm tra trạng thái hoạt động của Backend Server (44ms)
-  ✅ [PASS] T01: Đăng ký tài khoản người hiến máu (Donor) mới (121ms)
-  ✅ [PASS] T02: Đăng nhập cấp JWT Token chuẩn cho từng vai trò (342ms)
-  ✅ [PASS] T03: Chặn đặt lịch khi chưa đủ khoảng cách an toàn 84 ngày (32ms)
-  ✅ [PASS] T04: Tình nguyện viên đặt lịch hẹn hiến máu hợp lệ (12ms)
-  ✅ [PASS] T05: Bác sĩ xác nhận tiếp nhận máu và cộng dồn kho FEFO (21ms)
-  ✅ [PASS] T06: Bác sĩ / Bệnh viện tạo yêu cầu cấp cứu máu hỏa tốc (22ms)
-  ✅ [PASS] T07: Admin điều phối xuất kho FEFO và gán xe cứu thương 115 (28ms)
-  ✅ [PASS] T08: Kiểm tra bảo mật RBAC: Chặn Donor truy cập tài nguyên quản trị (44ms)
-  ✅ [PASS] T09: Bác sĩ & Admin quản lý vòng đời sự kiện hiến máu (65ms)
-  ✅ [PASS] T10: Đồng bộ danh sách sự kiện hiến máu công khai ra Trang chủ (13ms)
-  ✅ [PASS] T11: Lấy danh sách ca cấp cứu công khai dành cho Trang chủ & Donor (6ms)
-  ✅ [PASS] T12: Kiểm tra tính toàn vẹn và nhất quán của CSDL Kho Máu (6ms)
+  ✅ [PASS] T00: Kiểm tra trạng thái hoạt động của Backend Server (46ms)
+  ✅ [PASS] T01: Đăng ký tài khoản người hiến máu (Donor) mới (91ms)
+  ✅ [PASS] T02: Đăng nhập cấp JWT Token chuẩn cho từng vai trò (263ms)
+  ✅ [PASS] T03: Chặn đặt lịch khi chưa đủ khoảng cách an toàn 84 ngày (40ms)
+  ✅ [PASS] T04: Tình nguyện viên đặt lịch hẹn hiến máu hợp lệ (9ms)
+  ✅ [PASS] T05: Bác sĩ xác nhận tiếp nhận máu và cộng dồn kho FEFO (27ms)
+  ✅ [PASS] T06: Bác sĩ / Bệnh viện tạo yêu cầu cấp cứu máu hỏa tốc (18ms)
+  ✅ [PASS] T07: Admin điều phối xuất kho FEFO và gán xe cứu thương 115 (29ms)
+  ✅ [PASS] T08: Kiểm tra bảo mật RBAC: Chặn Donor truy cập tài nguyên quản trị (45ms)
+  ✅ [PASS] T09: Bác sĩ & Admin quản lý vòng đời sự kiện hiến máu (66ms)
+  ✅ [PASS] T10: Đồng bộ danh sách sự kiện hiến máu công khai ra Trang chủ (6ms)
+  ✅ [PASS] T11: Lấy danh sách ca cấp cứu công khai dành cho Trang chủ & Donor (5ms)
+  ✅ [PASS] T12: Kiểm tra tính toàn vẹn và nhất quán của CSDL Kho Máu (13ms)
   ✅ [PASS] T13: Đăng nhập sai mật khẩu: Trả về lỗi 401 & KHÔNG cấp JWT (84ms)
-  ✅ [PASS] T14: Nhập sai mật khẩu liên tiếp 5 lần: Tạm khóa 3 phút, hiển thị trong CSDL Admin và Admin mở lại được (641ms)
-  ✅ [PASS] T15: Tài khoản không tồn tại: Trả về lỗi 401 & KHÔNG cấp JWT (14ms)
+  ✅ [PASS] T14: Nhập sai mật khẩu liên tiếp 5 lần: Tạm khóa 3 phút, hiển thị trong CSDL Admin và Admin mở lại được (625ms)
+  ✅ [PASS] T15: Tài khoản không tồn tại: Trả về lỗi 401 & KHÔNG cấp JWT (13ms)
   ✅ [PASS] T16: Chặn gửi mảng / nhiều tài khoản cùng 1 request: Trả về 400 Bad Request (13ms)
+  ✅ [PASS] T17: Quên mật khẩu: Gửi mã OTP 6 số qua Email & Chặn email không tồn tại (2695ms)
+  ✅ [PASS] T18: Đặt lại mật khẩu: Chặn OTP sai & Kiểm tra bảo mật mật khẩu mới (22ms)
 
 ================================================================
 📊 KẾT QUẢ TỔNG HỢP KIỂM THỬ END-TO-END (E2E)
 ================================================================
-- Tổng số ca kiểm thử: 17
-- Thành công (PASS):   17
+- Tổng số ca kiểm thử: 19
+- Thành công (PASS):   19
 - Thất bại (FAIL):     0
 - Tỷ lệ Đạt:           100%
 ================================================================
@@ -52,7 +54,7 @@
 
 ---
 
-## 2. BẢNG CHI TIẾT 17 CA KIỂM THỬ E2E (DETAILED E2E TEST MATRIX)
+## 2. BẢNG CHI TIẾT 19 CA KIỂM THỬ E2E (DETAILED E2E TEST MATRIX)
 
 | Mã Test | Tên Ca Kiểm Thử | Endpoint / Method | Dữ Liệu Thử Nghiệm & Ràng Buộc | Kết Quả Kỳ Vọng | Kết Quả Thực Tế | Trạng Thái |
 | :--- | :--- | :--- | :--- | :--- | :--- | :---: |
@@ -73,6 +75,9 @@
 | **T14** | Tự động khóa 2 giai đoạn (Tạm khóa 3 phút & Khóa luôn CSDL sau 3 lần sai nữa) | `POST /api/v1/auth/login`, `GET /users`, `PUT /users/:id/status` | Nhập sai liên tiếp 5 lần -> Tạm khóa 3 phút; Hiển thị cờ `dangTamKhoa` và thời gian đếm ngược trong trang Quản trị Admin; Admin bấm mở khóa hoặc khóa luôn trong CSDL | HTTP 401 Unauthorized; Tạm khóa 3 phút; Đồng bộ trạng thái vào CSDL; Admin có toàn quyền mở khóa lại | HTTP 401/403/200; Quy trình bảo mật 2 giai đoạn và đồng bộ CSDL Quản lý Admin hoàn tất 100% | **PASS** |
 | **T15** | Tài khoản không tồn tại trong hệ thống | `POST /api/v1/auth/login` | Nhập email không tồn tại trong CSDL | HTTP 401 Unauthorized; Không cấp JWT Token; Thông báo lỗi an toàn | HTTP 401 Unauthorized; Bảo vệ chống thu thập thông tin tài khoản | **PASS** |
 | **T16** | Chống spam đăng ký hàng loạt (Batch Register) | `POST /api/v1/auth/register` | Gửi payload dạng mảng chứa nhiều tài khoản trong 1 request | HTTP 400 Bad Request; Chặn chỉ cho phép tạo 1 tài khoản duy nhất cho mỗi yêu cầu | HTTP 400 Bad Request; Chống lạm dụng tài nguyên thành công | **PASS** |
+| **T17** | Quên mật khẩu: Gửi OTP Gmail & Chặn email không tồn tại | `POST /api/v1/auth/forgot-password` | Gửi email không tồn tại -> 404; Gửi email hợp lệ -> Sinh OTP 6 số, TTL 5 phút, cooldown 60s, gửi qua Gmail SMTP | HTTP 404 Not Found khi email sai; HTTP 200 OK khi email đúng; Gửi mã OTP xác thực thành công | HTTP 404/200 OK; OTP sinh an toàn, gửi qua SMTP Gmail chuẩn xác | **PASS** |
+| **T18** | Đặt lại mật khẩu: Chặn OTP sai & Kiểm tra độ dài mật khẩu mới | `POST /api/v1/auth/reset-password` | Nhập OTP sai (000000); Mật khẩu mới < 8 ký tự; Mật khẩu hợp lệ băm Bcrypt 10 vòng | HTTP 400 Bad Request khi OTP sai hoặc mật khẩu yếu; HTTP 200 OK khi xác thực thành công, tự mở khóa tài khoản | HTTP 400 Bad Request chặn mã sai; Bảo mật 2 lớp hoàn hảo | **PASS** |
+
 
 ---
 

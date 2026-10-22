@@ -224,7 +224,18 @@ docker compose up -d --build
     - 🟡 **Tạm Khóa 3p (Còn Xp Ys)**: Dành cho tài khoản đang trong chu kỳ 3 phút tạm khóa.
     - 🟢 **Hoạt Động**: Tài khoản hoạt động bình thường, kèm cảnh báo số lần nhập sai nếu có.
   - Nút **Mở khóa nhanh (`Unlock`)**: Cho phép Admin mở khóa tài khoản ngay lập tức cho người dùng mà không cần chờ hết thời gian.
-- **Chống spam đăng ký hàng loạt**: Chặn hoàn toàn việc gửi mảng nhiều tài khoản trong 1 request (`400 Bad Request`).
+### 9. Quên Mật Khẩu & Cấp Lại Qua Mã OTP Gmail Thực Tế (Gmail SMTP & Glassmorphism Modal)
+- **Tích hợp Google Gmail SMTP thực tế (`nodemailer`)**: Gửi email HTML thương hiệu SMARTBLOOD chuẩn y tế đến hộp thư của người dùng với mã xác thực OTP 6 số ngẫu nhiên.
+- **Quy tắc an toàn & Chống lạm dụng**:
+  - Mã OTP có hiệu lực chính xác trong **5 phút (300 giây)**.
+  - Bộ đếm thời gian chờ gửi lại (Cooldown) **60 giây** để chống spam hòm thư.
+  - Giới hạn thử sai **tối đa 5 lần** (vượt quá 5 lần mã tự động hủy ngay để triệt tiêu nguy cơ Brute-force).
+- **Giao diện Modal 2 bước cao cấp**:
+  - **Bước 1**: Nhập email $\rightarrow$ Bấm *"GỬI MÃ OTP QUA GMAIL"*.
+  - **Bước 2**: Hiển thị email nhận mã, đồng hồ đếm ngược `5:00`, ô nhập 6 chữ số cỡ lớn, 2 ô mật khẩu mới (tối thiểu 8 ký tự, có toggle ẩn/hiện mắt), nút gửi lại mã có cooldown.
+  - **Trải nghiệm phím tắt thông minh**: Hỗ trợ nhấn phím **`Esc` (Escape)** hoặc click ra ngoài vùng nền mờ (Backdrop click) để lập tức đóng modal và quay về form Đăng nhập mà không bị thoát ra Trang chủ.
+- **Tự động mở khóa & Phục hồi tài khoản**: Sau khi người dùng xác thực OTP và đổi mật khẩu thành công, hệ thống tự động băm mật khẩu mới bằng **Bcrypt 10 vòng**, mở khóa tài khoản nếu đang bị tạm khóa và reset toàn bộ lượt vi phạm để người dùng đăng nhập lại ngay lập tức.
+- **Cơ chế Fallback Console**: Tự động in mã OTP ra Terminal/Console khi chưa cấu hình `EMAIL_APP_PASSWORD`, đảm bảo đồ án chạy mượt mà trên mọi máy chấm điểm.
 
 ---
 
@@ -246,15 +257,16 @@ pnpm --prefix Backend test
 - **Test 7:** Cơ chế LoginLimiter 2 giai đoạn (Tạm khóa 3 phút sau 5 lần sai, và khóa luôn sau 3 lần sai nữa).
 
 ### 2. End-to-End Tests (E2E Integration Tests)
-Bộ kiểm thử tích hợp toàn diện 17 kịch bản vận hành thực tế qua HTTP Client trực tiếp:
+Bộ kiểm thử tích hợp toàn diện 19 kịch bản vận hành thực tế qua HTTP Client trực tiếp:
 ```bash
 # Chạy bộ kiểm thử E2E
 pnpm test:e2e
 ```
-*Kết quả:* **17/17 Ca kiểm thử E2E Đạt Chuẩn (100% PASS)**:
-- Kiểm tra toàn diện vòng đời: Health Check, Đăng ký, Đăng nhập RBAC, Chặn vi phạm chu kỳ 84 ngày, Đặt lịch hiến máu, Xác nhận tiếp nhận cộng kho FEFO, Phát lệnh cấp cứu, Điều phối xuất kho FEFO gán xe 115, Quản lý sự kiện hiến máu, Đồng bộ Trang chủ, Toàn vẹn CSDL Kho Máu, An ninh đăng nhập sai mật khẩu 401 không cấp JWT, **Tự động khóa 2 giai đoạn (3 phút & Khóa luôn CSDL)**, và Chống spam đăng ký mảng.
+*Kết quả:* **19/19 Ca kiểm thử E2E Đạt Chuẩn (100% PASS)**:
+- Kiểm tra toàn diện vòng đời: Health Check (T00), Đăng ký (T01), Đăng nhập RBAC (T02), Chặn vi phạm chu kỳ 84 ngày (T03), Đặt lịch hiến máu (T04), Xác nhận tiếp nhận cộng kho FEFO (T05), Phát lệnh cấp cứu (T06), Điều phối xuất kho FEFO gán xe 115 (T07), Phân quyền an ninh RBAC (T08), Quản lý sự kiện hiến máu (T09), Đồng bộ Trang chủ (T10), Danh sách cấp cứu công khai (T11), Toàn vẹn CSDL Kho Máu (T12), Đăng nhập sai mật khẩu 401 không cấp JWT (T13), **Tự động khóa 2 giai đoạn 3 phút & Khóa luôn CSDL (T14)**, Tài khoản không tồn tại (T15), Chống spam đăng ký mảng (T16), **Quên mật khẩu gửi OTP Gmail thực tế & Chặn email sai (T17)**, và **Xác thực OTP đặt lại mật khẩu mới an toàn (T18)**.
 - Báo cáo chi tiết xem tại: [`docs/test-results.md`](file:///c:/smartblood/docs/test-results.md)
 
 ### 3. Tài Liệu API Chuẩn OpenAPI / Swagger
 - Truy cập Swagger UI trực tiếp tại: **[http://localhost:5000/api-docs](http://localhost:5000/api-docs)**
 - File đặc tả OpenAPI chuẩn: `docs/openapi.yaml`
+

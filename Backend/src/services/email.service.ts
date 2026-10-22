@@ -1,11 +1,17 @@
 import nodemailer, { type Transporter } from 'nodemailer';
+import dotenv from 'dotenv';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class EmailService {
   private static instance: EmailService;
   private transporter: Transporter | null = null;
 
   private constructor() {
-    this.initTransporter();
+    this.refreshTransporter();
   }
 
   public static getInstance(): EmailService {
@@ -15,22 +21,37 @@ export class EmailService {
     return EmailService.instance;
   }
 
-  private initTransporter(): void {
-    const user = process.env.EMAIL_USER;
-    const pass = process.env.EMAIL_APP_PASSWORD;
+  /**
+   * Tải lại cấu hình từ file .env động để luôn cập nhật ngay khi người dùng lưu file
+   */
+  public refreshTransporter(): Transporter | null {
+    try {
+      dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+      dotenv.config();
+    } catch {
+      // bỏ qua nếu lỗi đường dẫn
+    }
+
+    const user = process.env.EMAIL_USER?.trim();
+    const rawPass = process.env.EMAIL_APP_PASSWORD?.trim();
+    // Loại bỏ toàn bộ khoảng cách trong mã ứng dụng 16 ký tự của Google
+    const pass = rawPass ? rawPass.replace(/\s+/g, '') : '';
 
     if (user && pass) {
       this.transporter = nodemailer.createTransport({
         service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: {
           user,
           pass,
         },
       });
-      console.log(`📧 [EMAIL SERVICE] Đã kết nối Gmail SMTP với tài khoản: ${user}`);
+      return this.transporter;
     } else {
       this.transporter = null;
-      console.log('⚠️ [EMAIL SERVICE] Chưa cấu hình EMAIL_USER và EMAIL_APP_PASSWORD trong .env. Hệ thống sẽ in mã OTP ra Terminal để kiểm thử.');
+      return null;
     }
   }
 
@@ -43,6 +64,7 @@ export class EmailService {
     otpCode: string
   ): Promise<{ sent: boolean; simulated: boolean }> {
     const nowStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+    const transporter = this.refreshTransporter();
 
     // HTML Email Template chuẩn Y tế SMARTBLOOD cực đẹp
     const htmlContent = `
@@ -105,10 +127,11 @@ export class EmailService {
     `;
 
     // Nếu đã cấu hình Gmail Transporter thật
-    if (this.transporter) {
+    if (transporter) {
       try {
-        await this.transporter.sendMail({
-          from: `"SMARTBLOOD Y Tế" <${process.env.EMAIL_USER}>`,
+        const fromHeader = process.env.EMAIL_FROM || `"Hệ thống SMARTBLOOD" <${process.env.EMAIL_USER}>`;
+        await transporter.sendMail({
+          from: fromHeader,
           to: toEmail,
           subject: `[SMARTBLOOD] Mã OTP Xác Thực Đặt Lại Mật Khẩu: ${otpCode}`,
           html: htmlContent,

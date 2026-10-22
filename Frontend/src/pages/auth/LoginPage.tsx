@@ -67,6 +67,23 @@ export const LoginPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [forgotStep, otpExpireSeconds]);
 
+  // Khi modal Quên mật khẩu đang mở: Bấm phím ESC sẽ đóng modal và quay về trang Login
+  useEffect(() => {
+    if (!isForgotOpen) return;
+
+    const handleEscapeModal = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation(); // Chặn không cho hook useEscapeToHome điều hướng về Trang Chủ
+        setIsForgotOpen(false);
+      }
+    };
+
+    // Sử dụng capture phase (true) để chặn sự kiện trước khi lan ra các listener khác
+    window.addEventListener('keydown', handleEscapeModal, true);
+    return () => window.removeEventListener('keydown', handleEscapeModal, true);
+  }, [isForgotOpen]);
+
   // Mở modal quên mật khẩu
   const handleOpenForgotModal = () => {
     setForgotStep(1);
@@ -449,7 +466,12 @@ export const LoginPage: React.FC = () => {
       {/* MODAL QUÊN MẬT KHẨU & CẤP LẠI QUA MÃ OTP GMAIL (2 BƯỚC)        */}
       {/* ============================================================== */}
       {isForgotOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsForgotOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
+        >
           <div 
             className="w-full max-w-md bg-white rounded-3xl border border-slate-200/90 shadow-2xl shadow-black/50 overflow-hidden relative animate-in zoom-in-95 duration-200"
             role="dialog"
@@ -473,14 +495,19 @@ export const LoginPage: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsForgotOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all cursor-pointer"
-                title="Đóng modal"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <kbd className="hidden sm:inline-flex items-center px-2 py-0.5 text-[10px] font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 rounded-lg shadow-2xs">
+                  ESC
+                </kbd>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all cursor-pointer"
+                  title="Đóng modal (Esc)"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Bộ chỉ báo bước */}

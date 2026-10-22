@@ -592,6 +592,66 @@ async function runAllE2ETests() {
   });
 
   // ---------------------------------------------------------------------------
+  // T17: QUÊN MẬT KHẨU - GỬI MÃ OTP XÁC THỰC QUA GMAIL (POST /auth/forgot-password)
+  // ---------------------------------------------------------------------------
+  await executeTest('T17', 'Quên mật khẩu: Gửi mã OTP 6 số qua Email & Chặn email không tồn tại', 'POST /auth/forgot-password', async () => {
+    // 1. Thử gửi email không tồn tại trong CSDL -> Phải trả về 404 Not Found
+    const notFoundEmailRes = await request(`${BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      body: JSON.stringify({ email: 'email_chua_dang_ky_99999@gmail.com' }),
+    });
+    assert.equal(notFoundEmailRes.status, 404, 'Email không tồn tại phải trả về 404 Not Found');
+    assert.equal(notFoundEmailRes.data?.success, false);
+
+    // 2. Gửi yêu cầu với email tài khoản Donor hợp lệ vừa tạo
+    const forgotRes = await request(`${BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      body: JSON.stringify({ email: newDonorEmail }),
+    });
+    assert.equal(forgotRes.status, 200, 'Gửi yêu cầu OTP cho email hợp lệ phải trả về 200 OK');
+    assert.equal(forgotRes.data?.success, true);
+    assert.equal(forgotRes.data?.data?.email, newDonorEmail);
+    assert.ok(
+      forgotRes.data?.message?.includes('OTP') || forgotRes.data?.message?.includes('email') || forgotRes.data?.message?.includes('Gmail'),
+      'Phải có thông báo gửi OTP thành công'
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // T18: XÁC THỰC OTP & ĐẶT LẠI MẬT KHẨU (POST /auth/reset-password)
+  // ---------------------------------------------------------------------------
+  await executeTest('T18', 'Đặt lại mật khẩu: Chặn OTP sai & Kiểm tra bảo mật mật khẩu mới', 'POST /auth/reset-password', async () => {
+    // 1. Thử đặt lại mật khẩu với mã OTP sai (000000) -> Phải bị chặn 400 Bad Request
+    const wrongOtpRes = await request(`${BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: newDonorEmail,
+        otp: '000000',
+        matKhauMoi: 'NewStrongPassword@2026!',
+      }),
+    });
+    assert.equal(wrongOtpRes.status, 400, 'Nhập sai mã OTP phải trả về 400 Bad Request');
+    assert.equal(wrongOtpRes.data?.success, false);
+    assert.ok(
+      wrongOtpRes.data?.message?.includes('không chính xác') || wrongOtpRes.data?.message?.includes('OTP'),
+      'Phải có thông báo lỗi mã OTP sai'
+    );
+
+    // 2. Thử đặt lại mật khẩu với mật khẩu mới quá ngắn (< 8 ký tự) -> Phải bị chặn 400 Bad Request
+    const weakPassRes = await request(`${BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: newDonorEmail,
+        otp: '123456',
+        matKhauMoi: 'short',
+      }),
+    });
+    assert.equal(weakPassRes.status, 400, 'Mật khẩu mới ngắn hơn 8 ký tự phải trả về 400 Bad Request');
+    assert.equal(weakPassRes.data?.success, false);
+  });
+
+
+  // ---------------------------------------------------------------------------
   // IN KẾT QUẢ TỔNG HỢP E2E
   // ---------------------------------------------------------------------------
   const total = testResults.length;
