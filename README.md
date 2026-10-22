@@ -102,7 +102,14 @@ File `.env` mẫu đã được cấu hình sẵn trong cả 2 thư mục:
   JWT_SECRET=your_super_secret_jwt_key_blood_donation_2026
   JWT_EXPIRES_IN=7d
   CORS_ORIGIN=http://localhost:3000
+
+  # Gmail SMTP Configuration (Cấp lại mật khẩu qua OTP 6 số)
+  # Đăng nhập Gmail -> Quản lý tài khoản Google -> Bảo mật -> Mật khẩu ứng dụng (App Password)
+  EMAIL_USER=your_gmail@gmail.com
+  EMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+  EMAIL_FROM="Hệ thống SMARTBLOOD" <your_gmail@gmail.com>
   ```
+  *(💡 **Lưu ý**: Nếu chưa cấu hình `EMAIL_USER`/`EMAIL_APP_PASSWORD`, hệ thống sẽ tự động kích hoạt cơ chế Fallback in mã OTP ra Terminal phục vụ chấm đồ án mà không báo lỗi).*
 * **Frontend/.env**:
   ```ini
   VITE_API_URL=http://localhost:5000/api/v1
@@ -126,6 +133,20 @@ pnpm dev
 *Nếu muốn chạy độc lập từng thư mục:*
 * **Backend:** `cd Backend && pnpm dev` (Chạy tại: `http://localhost:5000`)
 * **Frontend:** `cd Frontend && pnpm dev` (Chạy tại: `http://localhost:3000`)
+
+---
+
+### Bước 4: Khởi chạy bằng Docker (Không phụ thuộc môi trường máy cá nhân)
+
+Hệ thống đã được đóng gói sẵn **Docker Multi-Stage & Docker Compose** để triển khai trên bất kỳ máy chủ nào:
+
+```bash
+# Khởi chạy toàn bộ hệ thống (Database MSSQL + Backend + Frontend Nginx)
+docker compose up -d --build
+```
+- **Frontend Web UI**: `http://localhost:3000`
+- **Backend API & Swagger**: `http://localhost:5000/api-docs`
+- **Health Check**: `http://localhost:5000/api/health`
 
 ---
 
@@ -191,24 +212,61 @@ pnpm dev
 - WebSocket (Socket.io) tự động kích hoạt còi hú báo động đỏ âm thanh trên toàn hệ thống.
 - Bàn điều phối xe 115 kết nối tài xế cấp cứu, hỗ trợ cuộc gọi nhanh qua hotline tài xế và tổng đài 1900 6868 để chuyển máu kịp thời tới phòng mổ.
 
+### 8. An Ninh Đăng Nhập & Cơ Chế Khóa Tài Khoản 2 Giai Đoạn (Brute-Force Protection)
+- **Sai mật khẩu không cấp JWT**: Mọi yêu cầu đăng nhập sai mật khẩu hoặc tài khoản không tồn tại đều trả về lỗi `401 Unauthorized`, tuyệt đối **không cấp JWT Token**.
+- **Cơ chế Khóa 2 Giai đoạn Độc quyền**:
+  - **Giai đoạn 1 (Tạm khóa 3 phút)**: Nhập sai mật khẩu liên tiếp **5 lần**, hệ thống kích hoạt cơ chế tạm khóa tài khoản trong **3 phút**, có đồng hồ đếm ngược từng giây.
+  - **Giai đoạn 2 (Khóa luôn vào CSDL)**: Sau khi hết 3 phút tạm khóa, nếu người dùng tiếp tục nhập sai **3 lần nữa**, hệ thống sẽ **khóa luôn tài khoản vĩnh viễn** trực tiếp trong CSDL (`user.trangThai = 'Khoa'`). Mọi nỗ lực đăng nhập sau đó đều bị chặn với mã lỗi `403 Forbidden`.
+  - **Chỉ Admin mới có quyền mở lại**: Tài khoản bị khóa chỉ có thể được mở lại bởi tài khoản Quản trị viên (Admin).
+- **Đồng bộ thời gian thực vào Trang Quản Lý Tài Khoản Admin**:
+  - Huy hiệu trạng thái phân biệt rõ ràng:
+    - 🔴 **Bị Khóa (Chờ Admin mở)**: Dành cho tài khoản bị khóa vĩnh viễn trong CSDL.
+    - 🟡 **Tạm Khóa 3p (Còn Xp Ys)**: Dành cho tài khoản đang trong chu kỳ 3 phút tạm khóa.
+    - 🟢 **Hoạt Động**: Tài khoản hoạt động bình thường, kèm cảnh báo số lần nhập sai nếu có.
+  - Nút **Mở khóa nhanh (`Unlock`)**: Cho phép Admin mở khóa tài khoản ngay lập tức cho người dùng mà không cần chờ hết thời gian.
+### 9. Quên Mật Khẩu & Cấp Lại Qua Mã OTP Gmail Thực Tế (Gmail SMTP & Glassmorphism Modal)
+- **Tích hợp Google Gmail SMTP thực tế (`nodemailer`)**: Gửi email HTML thương hiệu SMARTBLOOD chuẩn y tế đến hộp thư của người dùng với mã xác thực OTP 6 số ngẫu nhiên.
+- **Quy tắc an toàn & Chống lạm dụng**:
+  - Mã OTP có hiệu lực chính xác trong **5 phút (300 giây)**.
+  - Bộ đếm thời gian chờ gửi lại (Cooldown) **60 giây** để chống spam hòm thư.
+  - Giới hạn thử sai **tối đa 5 lần** (vượt quá 5 lần mã tự động hủy ngay để triệt tiêu nguy cơ Brute-force).
+- **Giao diện Modal 2 bước cao cấp**:
+  - **Bước 1**: Nhập email $\rightarrow$ Bấm *"GỬI MÃ OTP QUA GMAIL"*.
+  - **Bước 2**: Hiển thị email nhận mã, đồng hồ đếm ngược `5:00`, ô nhập 6 chữ số cỡ lớn, 2 ô mật khẩu mới (tối thiểu 8 ký tự, có toggle ẩn/hiện mắt), nút gửi lại mã có cooldown.
+  - **Trải nghiệm phím tắt thông minh**: Hỗ trợ nhấn phím **`Esc` (Escape)** hoặc click ra ngoài vùng nền mờ (Backdrop click) để lập tức đóng modal và quay về form Đăng nhập mà không bị thoát ra Trang chủ.
+- **Tự động mở khóa & Phục hồi tài khoản**: Sau khi người dùng xác thực OTP và đổi mật khẩu thành công, hệ thống tự động băm mật khẩu mới bằng **Bcrypt 10 vòng**, mở khóa tài khoản nếu đang bị tạm khóa và reset toàn bộ lượt vi phạm để người dùng đăng nhập lại ngay lập tức.
+- **Cơ chế Fallback Console**: Tự động in mã OTP ra Terminal/Console khi chưa cấu hình `EMAIL_APP_PASSWORD`, đảm bảo đồ án chạy mượt mà trên mọi máy chấm điểm.
+
 ---
 
 ## 5. Kiểm Thử Hệ Thống (Testing & API Docs)
 
-### Unit Tests
+### 1. Unit Tests (Logic Cốt Lõi)
 Dự án tích hợp bộ kiểm thử tự động kiểm tra các logic y tế cốt lõi:
 ```bash
 # Chạy bộ Unit Tests Backend
 pnpm --prefix Backend test
 ```
-*Kết quả:* **6/6 Tests Pass (100%)**:
-- Quy tắc ma trận tương thích nhóm máu truyền toàn phần (O- cho tất cả, AB+ nhận tất cả).
-- Quy tắc tương thích huyết tương (Plasma).
-- Lớp ngoại lệ `AppError` và chuẩn HTTP Status Codes.
-- Thuật toán phân trang (Pagination Helpers).
-- Cơ chế DTO Validation đầu vào.
-- Tính chu kỳ an toàn 84 ngày.
+*Kết quả:* **7/7 Tests Pass (100%)**:
+- **Test 1:** Quy tắc ma trận tương thích nhóm máu truyền toàn phần (O- cho tất cả, AB+ nhận tất cả).
+- **Test 2:** Quy tắc tương thích huyết tương (Plasma).
+- **Test 3:** Lớp ngoại lệ `AppError` và chuẩn HTTP Status Codes.
+- **Test 4:** Thuật toán phân trang (Pagination Helpers).
+- **Test 5:** Cơ chế DTO Validation đầu vào.
+- **Test 6:** Quy tắc khoảng cách an toàn 84 ngày giữa 2 lần hiến máu.
+- **Test 7:** Cơ chế LoginLimiter 2 giai đoạn (Tạm khóa 3 phút sau 5 lần sai, và khóa luôn sau 3 lần sai nữa).
 
-### Tài Liệu API Chuẩn OpenAPI / Swagger
+### 2. End-to-End Tests (E2E Integration Tests)
+Bộ kiểm thử tích hợp toàn diện 19 kịch bản vận hành thực tế qua HTTP Client trực tiếp:
+```bash
+# Chạy bộ kiểm thử E2E
+pnpm test:e2e
+```
+*Kết quả:* **19/19 Ca kiểm thử E2E Đạt Chuẩn (100% PASS)**:
+- Kiểm tra toàn diện vòng đời: Health Check (T00), Đăng ký (T01), Đăng nhập RBAC (T02), Chặn vi phạm chu kỳ 84 ngày (T03), Đặt lịch hiến máu (T04), Xác nhận tiếp nhận cộng kho FEFO (T05), Phát lệnh cấp cứu (T06), Điều phối xuất kho FEFO gán xe 115 (T07), Phân quyền an ninh RBAC (T08), Quản lý sự kiện hiến máu (T09), Đồng bộ Trang chủ (T10), Danh sách cấp cứu công khai (T11), Toàn vẹn CSDL Kho Máu (T12), Đăng nhập sai mật khẩu 401 không cấp JWT (T13), **Tự động khóa 2 giai đoạn 3 phút & Khóa luôn CSDL (T14)**, Tài khoản không tồn tại (T15), Chống spam đăng ký mảng (T16), **Quên mật khẩu gửi OTP Gmail thực tế & Chặn email sai (T17)**, và **Xác thực OTP đặt lại mật khẩu mới an toàn (T18)**.
+- Báo cáo chi tiết xem tại: [`docs/test-results.md`](file:///c:/smartblood/docs/test-results.md)
+
+### 3. Tài Liệu API Chuẩn OpenAPI / Swagger
 - Truy cập Swagger UI trực tiếp tại: **[http://localhost:5000/api-docs](http://localhost:5000/api-docs)**
 - File đặc tả OpenAPI chuẩn: `docs/openapi.yaml`
+

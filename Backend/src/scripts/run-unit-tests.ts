@@ -146,6 +146,81 @@ runTest('Unit Test 6: Kiểm tra chênh lệch thời gian tối thiểu 84 ngà
   assert.ok(diffDaysValid >= 84, `90 ngày phải lớn hơn hoặc bằng 84 ngày (thực tế: ${diffDaysValid})`);
 });
 
+// -----------------------------------------------------------------------------
+// TEST CASE 7: Cơ chế Login Limiter 2 giai đoạn (Tạm khóa 3 phút sau 5 lần sai, và khóa luôn sau 3 lần sai tiếp theo)
+// -----------------------------------------------------------------------------
+runTest('Unit Test 7: Cơ chế LoginLimiter 2 giai đoạn: Tạm khóa 3 phút khi sai 5 lần, khóa luôn sau 3 lần sai nữa', async () => {
+  const { LoginLimiterService } = await import('../services/loginLimiter.service.js');
+  const limiter = LoginLimiterService.getInstance();
+  const testAccount = `unittest_user_${Date.now()}@test.vn`;
+
+  // Ban đầu: Chưa bị khóa
+  assert.equal(limiter.checkLockout(testAccount).isLocked, false);
+
+  // Giai đoạn 1: Nhập sai lần 1 -> còn 4 lần
+  const att1 = limiter.recordFailedAttempt(testAccount);
+  assert.equal(att1.attempts, 1);
+  assert.equal(att1.remainingAttempts, 4);
+  assert.equal(att1.isTempLocked, false);
+  assert.equal(att1.isPermanentLock, false);
+
+  // Nhập sai lần 2, 3, 4
+  limiter.recordFailedAttempt(testAccount);
+  limiter.recordFailedAttempt(testAccount);
+  const att4 = limiter.recordFailedAttempt(testAccount);
+  assert.equal(att4.attempts, 4);
+  assert.equal(att4.remainingAttempts, 1);
+  assert.equal(att4.isTempLocked, false);
+
+  // Nhập sai lần thứ 5 -> Kích hoạt tạm khóa 3 phút
+  const att5 = limiter.recordFailedAttempt(testAccount);
+  assert.equal(att5.attempts, 5);
+  assert.equal(att5.remainingAttempts, 0);
+  assert.equal(att5.isTempLocked, true);
+  assert.equal(att5.isPermanentLock, false);
+  assert.equal(att5.lockDurationMinutes, 3);
+
+  // Kiểm tra trạng thái khóa
+  const checkLocked = limiter.checkLockout(testAccount);
+  assert.equal(checkLocked.isLocked, true);
+  assert.ok(checkLocked.remainingMinutes > 0 && checkLocked.remainingMinutes <= 3);
+
+  // Giả lập: Hết thời gian 3 phút tạm khóa (qua giai đoạn 2)
+  const key = (limiter as any).normalizeKey(testAccount);
+  const record = (limiter as any).attempts.get(key);
+  record.lockedUntil = Date.now() - 1000; // Đã quá hạn khóa tạm
+
+  // Sau khi hết tạm khóa: checkLockout phải báo isLocked = false, hasBeenTempLocked = true
+  const checkUnlocked = limiter.checkLockout(testAccount);
+  assert.equal(checkUnlocked.isLocked, false);
+  assert.equal(checkUnlocked.hasBeenTempLocked, true);
+
+  // Giai đoạn 2: Nhập sai lần 1 sau tạm khóa -> còn 2 lần
+  const stage2_att1 = limiter.recordFailedAttempt(testAccount);
+  assert.equal(stage2_att1.stage, 2);
+  assert.equal(stage2_att1.attempts, 1);
+  assert.equal(stage2_att1.remainingAttempts, 2);
+  assert.equal(stage2_att1.isPermanentLock, false);
+
+  // Giai đoạn 2: Nhập sai lần 2 sau tạm khóa -> còn 1 lần
+  const stage2_att2 = limiter.recordFailedAttempt(testAccount);
+  assert.equal(stage2_att2.stage, 2);
+  assert.equal(stage2_att2.attempts, 2);
+  assert.equal(stage2_att2.remainingAttempts, 1);
+  assert.equal(stage2_att2.isPermanentLock, false);
+
+  // Giai đoạn 2: Nhập sai lần 3 sau tạm khóa -> KHÓA LUÔN (isPermanentLock = true)
+  const stage2_att3 = limiter.recordFailedAttempt(testAccount);
+  assert.equal(stage2_att3.stage, 2);
+  assert.equal(stage2_att3.attempts, 3);
+  assert.equal(stage2_att3.remainingAttempts, 0);
+  assert.equal(stage2_att3.isPermanentLock, true);
+
+  // Admin mở lại tài khoản (resetAttempts)
+  limiter.resetAttempts(testAccount);
+  assert.equal(limiter.checkLockout(testAccount).isLocked, false);
+});
+
 console.log('\n------------------------------------------------------');
 console.log(`🏁 KẾT QUẢ KIỂM THỬ: ${passedTests}/${totalTests} TESTS VƯỢT QUA (${Math.round((passedTests / totalTests) * 100)}%)`);
 console.log('------------------------------------------------------\n');

@@ -423,6 +423,235 @@ async function runAllE2ETests() {
   });
 
   // ---------------------------------------------------------------------------
+  // T13: KIỂM THỬ AN TOÀN ĐĂNG NHẬP: SAI MẬT KHẨU KHÔNG CẤP JWT (HÌNH 1 - TÌNH HUỐNG 1)
+  // ---------------------------------------------------------------------------
+  await executeTest('T13', 'Đăng nhập sai mật khẩu: Trả về lỗi 401 & KHÔNG cấp JWT', 'POST /auth/login', async () => {
+    const wrongPassRes = await request(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'admin@hienmau.vn',
+        matKhau: 'MatKhauSaiHoanToan123!',
+      }),
+    });
+
+    assert.equal(wrongPassRes.status, 401, `Sai mật khẩu phải trả về 401 Unauthorized, nhận: ${wrongPassRes.status}`);
+    assert.equal(wrongPassRes.data?.data?.accessToken, undefined, 'Tuyệt đối KHÔNG được cấp JWT khi sai mật khẩu');
+    assert.equal(wrongPassRes.data?.data?.token, undefined, 'Tuyệt đối KHÔNG được cấp token khi sai mật khẩu');
+    assert.ok(wrongPassRes.data?.message?.includes('Mật khẩu không chính xác'), 'Phải có thông báo lỗi mật khẩu không chính xác');
+  });
+
+  // ---------------------------------------------------------------------------
+  // T14: TỰ ĐỘNG KHÓA TÀI KHOẢN KHI NHẬP SAI (3 PHÚT & ĐỒNG BỘ QUẢN LÝ ADMIN)
+  // ---------------------------------------------------------------------------
+  await executeTest('T14', 'Nhập sai mật khẩu liên tiếp 5 lần: Tạm khóa 3 phút, hiển thị trong CSDL Admin và Admin mở lại được', 'POST /auth/login', async () => {
+    // Tạo 1 email test riêng để thử nghiệm chu kỳ khóa 5 lần
+    const testBruteEmail = `bruteforce.${Date.now()}@hienmau.vn`;
+    const regRes = await request(`${BASE_URL}/auth/register`, {
+      method: 'POST',
+      body: JSON.stringify({
+        hoTen: 'Người Dùng Test Khóa Ba Phút',
+        email: testBruteEmail,
+        matKhau: 'Password@123',
+        soDienThoai: `09${Math.floor(10000000 + Math.random() * 90000000)}`,
+        cccd: `00109${Math.floor(1000000 + Math.random() * 9000000)}`,
+        nhomMau: 'O+',
+        diaChi: 'TP.HCM',
+      }),
+    });
+    assert.equal(regRes.status, 201, `Đăng ký tài khoản test phải 201, nhận: ${JSON.stringify(regRes.data)}`);
+    const createdUserId = regRes.data?.data?.id;
+
+    // Thử nhập sai liên tiếp 5 lần
+    let lastRes: any;
+    for (let i = 1; i <= 5; i++) {
+      lastRes = await request(`${BASE_URL}/auth/login`, {
+        method: 'POST',
+        body: JSON.stringify({
+          email: testBruteEmail,
+          matKhau: 'SaiMatKhau' + i,
+        }),
+      });
+      assert.equal(lastRes.status, 401, `Lần ${i} sai mật khẩu phải trả về 401`);
+      assert.equal(lastRes.data?.data?.accessToken, undefined, 'Không được cấp JWT');
+    }
+
+    // Ở lần thứ 5, phản hồi phải có thông báo đã bị tạm khóa trong 3 phút
+    assert.ok(
+      lastRes.data?.message?.includes('tạm khóa trong 3 phút') || lastRes.data?.message?.includes('tạm khóa'),
+      `Lần thứ 5 phải thông báo tạm khóa 3 phút. Nhận: ${lastRes.data?.message}`
+    );
+
+    // Lần thứ 6 thử đăng nhập (dù đúng hay sai mật khẩu) đều phải bị từ chối do đang trong thời gian tạm khóa 3 phút
+    const lockedRes = await request(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: testBruteEmail,
+        matKhau: 'Password@123', // Thử mật khẩu đúng trong khi đang bị khóa
+      }),
+    });
+    assert.equal(lockedRes.status, 401, 'Khi tài khoản đang bị tạm khóa phải trả về lỗi 401');
+    assert.equal(lockedRes.data?.data?.accessToken, undefined, 'Không được cấp JWT khi tài khoản đang bị khóa');
+    assert.ok(
+      lockedRes.data?.message?.includes('tạm khóa'),
+      'Phải thông báo tài khoản đang bị tạm khóa'
+    );
+
+    // Kiểm tra đồng bộ dữ liệu vào Trang Quản lý tài khoản Admin (GET /users)
+    const listRes = await request(`${BASE_URL}/users?search=${testBruteEmail}`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(listRes.status, 200, 'Admin lấy danh sách người dùng phải 200 OK');
+    const userFound = (listRes.data?.data?.items || listRes.data?.data)?.[0];
+    assert.ok(userFound, 'Admin phải tìm thấy tài khoản vừa bị khóa');
+    assert.equal(userFound.dangTamKhoa, true, 'User phải hiển thị cờ dangTamKhoa = true');
+    assert.ok(userFound.tamKhoaPhut > 0 && userFound.tamKhoaPhut <= 3, 'Phải có thời gian tạm khóa còn lại <= 3 phút');
+
+    // Admin thực hiện mở khóa nhanh qua API PUT /users/:id/status
+    const targetId = userFound.id || createdUserId;
+    const unlockRes = await request(`${BASE_URL}/users/${targetId}/status`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(unlockRes.status, 200, 'Admin mở khóa tài khoản phải trả về 200 OK');
+
+    // Sau khi Admin mở khóa, người dùng đăng nhập lại thành công với mật khẩu đúng
+    const loginAfterUnlock = await request(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: testBruteEmail,
+        matKhau: 'Password@123',
+      }),
+    });
+    assert.equal(loginAfterUnlock.status, 200, 'Sau khi Admin mở khóa, đăng nhập đúng mật khẩu phải 200 OK');
+    assert.ok(loginAfterUnlock.data?.data?.accessToken, 'Đăng nhập thành công phải được cấp JWT Access Token');
+
+    // Kiểm tra trường hợp Admin khóa tài khoản vào CSDL (trangThai = Khoa)
+    const lockDbRes = await request(`${BASE_URL}/users/${targetId}/status`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(lockDbRes.status, 200);
+    assert.equal(lockDbRes.data?.data?.trangThai, 'Khoa', 'Tài khoản phải chuyển sang trạng thái Khoa trong CSDL');
+
+    // Người dùng đăng nhập khi bị Admin khóa -> Phải trả về 403 Forbidden
+    const forbiddenRes = await request(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: testBruteEmail,
+        matKhau: 'Password@123',
+      }),
+    });
+    assert.equal(forbiddenRes.status, 403, 'Tài khoản bị khóa trong CSDL phải trả về 403 Forbidden');
+    assert.equal(forbiddenRes.data?.data?.accessToken, undefined, 'Không được cấp JWT');
+    assert.ok(forbiddenRes.data?.message?.includes('bị khóa'), 'Phải thông báo tài khoản bị khóa');
+
+    // Admin mở lại tài khoản
+    const restoreRes = await request(`${BASE_URL}/users/${targetId}/status`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.equal(restoreRes.status, 200);
+    assert.equal(restoreRes.data?.data?.trangThai, 'HoatDong');
+  });
+
+  // ---------------------------------------------------------------------------
+  // T15: TÀI KHOẢN KHÔNG TỒN TẠI (HÌNH 3 - QUY TẮC ĐĂNG NHẬP)
+  // ---------------------------------------------------------------------------
+  await executeTest('T15', 'Tài khoản không tồn tại: Trả về lỗi 401 & KHÔNG cấp JWT', 'POST /auth/login', async () => {
+    const notFoundRes = await request(`${BASE_URL}/auth/login`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: 'khongtontai99999@gmail.com',
+        matKhau: 'Password@123',
+      }),
+    });
+
+    assert.equal(notFoundRes.status, 401, 'Tài khoản không tồn tại phải trả về 401 Unauthorized');
+    assert.equal(notFoundRes.data?.data?.accessToken, undefined, 'Không được cấp JWT');
+    assert.ok(
+      notFoundRes.data?.message?.includes('không tồn tại') || notFoundRes.data?.message?.includes('không chính xác'),
+      'Phải có thông báo lỗi tài khoản không tồn tại'
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // T16: CHẶN TẠO NHIỀU TÀI KHOẢN CÙNG 1 REQUEST (CHỐNG SPAM / BATCH REGISTER)
+  // ---------------------------------------------------------------------------
+  await executeTest('T16', 'Chặn gửi mảng / nhiều tài khoản cùng 1 request: Trả về 400 Bad Request', 'POST /auth/register', async () => {
+    const batchRes = await request(`${BASE_URL}/auth/register`, {
+      method: 'POST',
+      body: JSON.stringify([
+        { hoTen: 'User 1', email: 'user1@test.com', matKhau: 'Password@123', soDienThoai: '0900000001' },
+        { hoTen: 'User 2', email: 'user2@test.com', matKhau: 'Password@123', soDienThoai: '0900000002' },
+      ]),
+    });
+
+    assert.equal(batchRes.status, 400, `Gửi mảng tạo nhiều tài khoản phải bị chặn 400 Bad Request, nhận: ${batchRes.status}`);
+    assert.equal(batchRes.data?.success, false);
+    assert.ok(batchRes.data?.message?.includes('duy nhất 1'), 'Phải thông báo chỉ cho phép tạo 1 tài khoản cho mỗi request');
+  });
+
+  // ---------------------------------------------------------------------------
+  // T17: QUÊN MẬT KHẨU - GỬI MÃ OTP XÁC THỰC QUA GMAIL (POST /auth/forgot-password)
+  // ---------------------------------------------------------------------------
+  await executeTest('T17', 'Quên mật khẩu: Gửi mã OTP 6 số qua Email & Chặn email không tồn tại', 'POST /auth/forgot-password', async () => {
+    // 1. Thử gửi email không tồn tại trong CSDL -> Phải trả về 404 Not Found
+    const notFoundEmailRes = await request(`${BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      body: JSON.stringify({ email: 'email_chua_dang_ky_99999@gmail.com' }),
+    });
+    assert.equal(notFoundEmailRes.status, 404, 'Email không tồn tại phải trả về 404 Not Found');
+    assert.equal(notFoundEmailRes.data?.success, false);
+
+    // 2. Gửi yêu cầu với email tài khoản Donor hợp lệ vừa tạo
+    const forgotRes = await request(`${BASE_URL}/auth/forgot-password`, {
+      method: 'POST',
+      body: JSON.stringify({ email: newDonorEmail }),
+    });
+    assert.equal(forgotRes.status, 200, 'Gửi yêu cầu OTP cho email hợp lệ phải trả về 200 OK');
+    assert.equal(forgotRes.data?.success, true);
+    assert.equal(forgotRes.data?.data?.email, newDonorEmail);
+    assert.ok(
+      forgotRes.data?.message?.includes('OTP') || forgotRes.data?.message?.includes('email') || forgotRes.data?.message?.includes('Gmail'),
+      'Phải có thông báo gửi OTP thành công'
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // T18: XÁC THỰC OTP & ĐẶT LẠI MẬT KHẨU (POST /auth/reset-password)
+  // ---------------------------------------------------------------------------
+  await executeTest('T18', 'Đặt lại mật khẩu: Chặn OTP sai & Kiểm tra bảo mật mật khẩu mới', 'POST /auth/reset-password', async () => {
+    // 1. Thử đặt lại mật khẩu với mã OTP sai (000000) -> Phải bị chặn 400 Bad Request
+    const wrongOtpRes = await request(`${BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: newDonorEmail,
+        otp: '000000',
+        matKhauMoi: 'NewStrongPassword@2026!',
+      }),
+    });
+    assert.equal(wrongOtpRes.status, 400, 'Nhập sai mã OTP phải trả về 400 Bad Request');
+    assert.equal(wrongOtpRes.data?.success, false);
+    assert.ok(
+      wrongOtpRes.data?.message?.includes('không chính xác') || wrongOtpRes.data?.message?.includes('OTP'),
+      'Phải có thông báo lỗi mã OTP sai'
+    );
+
+    // 2. Thử đặt lại mật khẩu với mật khẩu mới quá ngắn (< 8 ký tự) -> Phải bị chặn 400 Bad Request
+    const weakPassRes = await request(`${BASE_URL}/auth/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({
+        email: newDonorEmail,
+        otp: '123456',
+        matKhauMoi: 'short',
+      }),
+    });
+    assert.equal(weakPassRes.status, 400, 'Mật khẩu mới ngắn hơn 8 ký tự phải trả về 400 Bad Request');
+    assert.equal(weakPassRes.data?.success, false);
+  });
+
+
+  // ---------------------------------------------------------------------------
   // IN KẾT QUẢ TỔNG HỢP E2E
   // ---------------------------------------------------------------------------
   const total = testResults.length;

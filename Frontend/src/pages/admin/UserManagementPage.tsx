@@ -37,6 +37,10 @@ interface UserItem {
   diaChi?: string | null;
   vaiTro: 'ADMIN' | 'HOSPITAL_STAFF' | 'DONOR';
   trangThai: 'HoatDong' | 'Khoa' | string;
+  dangTamKhoa?: boolean;
+  tamKhoaPhut?: number;
+  tamKhoaGiay?: number;
+  soLanNhapSai?: number;
   ngayTao?: string;
   ngayCapNhat?: string;
 }
@@ -315,7 +319,13 @@ export const UserManagementPage: React.FC = () => {
   // Lọc danh sách
   const filteredUsers = users.filter((u) => {
     const matchRole = roleFilter === 'ALL' || u.vaiTro === roleFilter;
-    const matchStatus = statusFilter === 'ALL' || u.trangThai === statusFilter;
+    const matchStatus =
+      statusFilter === 'ALL' ||
+      (statusFilter === 'TamKhoa'
+        ? Boolean(u.dangTamKhoa)
+        : statusFilter === 'Khoa'
+        ? u.trangThai === 'Khoa'
+        : u.trangThai === 'HoatDong' && !u.dangTamKhoa);
     const name = u.hoTen || '';
     const email = u.email || '';
     const phone = u.soDienThoai || '';
@@ -476,7 +486,8 @@ export const UserManagementPage: React.FC = () => {
           >
             <option value="ALL">Tất cả trạng thái</option>
             <option value="HoatDong">Đang hoạt động</option>
-            <option value="Khoa">Đã bị khóa</option>
+            <option value="Khoa">Bị khóa (Chờ Admin mở)</option>
+            <option value="TamKhoa">Đang tạm khóa (3 phút)</option>
           </select>
         </div>
       </div>
@@ -577,14 +588,33 @@ export const UserManagementPage: React.FC = () => {
 
                       {/* Trạng thái */}
                       <td className="py-3.5 px-4">
-                        {isLocked ? (
-                          <span className="px-2 py-0.5 rounded-full bg-red-100 text-blood-primary font-bold text-[10px] inline-flex items-center gap-1">
-                            <Lock className="w-3 h-3" /> Bị Khóa
-                          </span>
+                        {item.trangThai === 'Khoa' ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="px-2 py-0.5 rounded-full bg-red-100 text-blood-primary font-black text-[10px] inline-flex items-center gap-1 w-fit shadow-2xs">
+                              <Lock className="w-3 h-3 text-red-600" /> Bị Khóa
+                            </span>
+                            <span className="text-[10px] text-red-600 font-bold">Chờ Admin mở</span>
+                          </div>
+                        ) : item.dangTamKhoa ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-black text-[10px] inline-flex items-center gap-1 w-fit shadow-2xs animate-pulse">
+                              <Lock className="w-3 h-3 text-amber-700" /> Tạm Khóa 3p
+                            </span>
+                            <span className="text-[10px] text-amber-700 font-bold">
+                              Còn {item.tamKhoaPhut || 0}p {item.tamKhoaGiay || 0}s
+                            </span>
+                          </div>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] inline-flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Hoạt Động
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px] inline-flex items-center gap-1 w-fit shadow-2xs">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Hoạt Động
+                            </span>
+                            {item.soLanNhapSai && item.soLanNhapSai > 0 ? (
+                              <span className="text-[10px] text-amber-600 font-medium">
+                                (Sai {item.soLanNhapSai}/5)
+                              </span>
+                            ) : null}
+                          </div>
                         )}
                       </td>
 
@@ -616,12 +646,22 @@ export const UserManagementPage: React.FC = () => {
                           <button
                             onClick={() => handleToggleStatus(item)}
                             disabled={Boolean(isCurrent)}
-                            title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
+                            title={
+                              isCurrent
+                                ? 'Không thể thao tác tài khoản hiện tại'
+                                : isLocked || item.dangTamKhoa
+                                ? 'Mở khóa tài khoản ngay lập tức cho người dùng'
+                                : 'Khóa tài khoản'
+                            }
                             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                              isCurrent ? 'opacity-30 cursor-not-allowed' : isLocked ? 'text-emerald-600 hover:bg-emerald-50' : 'text-amber-600 hover:bg-amber-50'
+                              isCurrent
+                                ? 'opacity-30 cursor-not-allowed'
+                                : isLocked || item.dangTamKhoa
+                                ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 ring-1 ring-emerald-300 font-bold'
+                                : 'text-amber-600 hover:bg-amber-50'
                             }`}
                           >
-                            {isLocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                            {isLocked || item.dangTamKhoa ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                           </button>
 
                           <button

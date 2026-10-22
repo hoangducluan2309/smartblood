@@ -55,6 +55,9 @@ export const getRoleDestination = (
       requestedPath.startsWith('/staff') ||
       requestedPath === '/events' ||
       requestedPath === '/inventory' ||
+      requestedPath === '/admin/dispatch' ||
+      requestedPath === '/admin/inventory' ||
+      requestedPath === '/admin/forecast' ||
       requestedPath === '/profile'
     ) {
       return requestedPath;

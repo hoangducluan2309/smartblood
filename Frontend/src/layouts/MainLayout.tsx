@@ -51,7 +51,7 @@ export const MainLayout: React.FC = () => {
                     <span className="font-black text-base">🩸</span>
                   </div>
                   <span className="font-black text-lg tracking-tight text-white group-hover:text-rose-200 transition-colors">
-                    BLOOD<span className="text-red-500">SMART</span>
+                    SMART<span className="text-red-500">BLOOD</span>
                   </span>
                 </Link>
                 <p className="text-xs text-slate-400 leading-relaxed font-normal">
@@ -140,7 +140,7 @@ export const MainLayout: React.FC = () => {
 
             <div className="pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-medium">
               <div>
-                &copy; 2026 BloodSmart Platform &bull; Bản quyền thuộc Dự án Điều phối Máu Quốc gia.
+                &copy; 2026 SmartBlood Platform &bull; Bản quyền thuộc Dự án Điều phối Máu Quốc gia.
               </div>
               <div className="flex items-center gap-4 text-[11px]">
                 <span className="hover:text-slate-300 cursor-pointer transition-colors">Chính sách bảo mật</span>

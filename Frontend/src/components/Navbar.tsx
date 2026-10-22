@@ -511,7 +511,7 @@ export const Navbar: React.FC = () => {
             <div className="flex flex-col">
               <div className="flex items-center gap-1 sm:gap-1.5">
                 <span className="font-black text-base sm:text-xl tracking-tight text-slate-900 leading-none">
-                  BLOOD<span className="bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent font-black">SMART</span>
+                  SMART<span className="bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent font-black">BLOOD</span>
                 </span>
                 <span className="px-1 sm:px-1.5 py-0.5 text-[8px] sm:text-[9px] font-black uppercase tracking-wider bg-red-100 text-red-600 rounded-md border border-red-200/60">
                   24/7

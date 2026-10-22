@@ -86,7 +86,7 @@ export const ProfilePage: React.FC = () => {
   }, [user]);
 
   const displayName = form.hoTen || user?.email || 'Người dùng';
-  const roleLabel = user ? roleLabels[user.role] : 'Tài khoản BloodSmart';
+  const roleLabel = user ? roleLabels[user.role] : 'Tài khoản SmartBlood';
   const bloodType = useMemo(() => {
     if (user?.bloodType) return user.bloodType;
     if (!user?.nhomMau) return '';

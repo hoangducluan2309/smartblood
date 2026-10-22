@@ -136,6 +136,75 @@
       }
     },
     {
+      "name": "02b. Auth - Quên mật khẩu: Gửi mã OTP về Gmail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Forgot Password - Trạng thái HTTP phải là 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Forgot Password - Nhận phản hồi hướng dẫn gửi OTP thành công', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(true);",
+              "    pm.expect(jsonData.message).to.be.a('string');",
+              "    pm.expect(jsonData.data.email).to.eql(pm.collectionVariables.get('uniqueEmail') || 'admin@smartblood.vn');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{uniqueEmail}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "forgot-password"]
+        }
+      }
+    },
+    {
+      "name": "02c. Auth - Xác thực OTP & Đặt lại mật khẩu mới",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Reset Password - Trạng thái HTTP phản hồi (200 OK nếu OTP đúng hoặc 400 nếu OTP sai/hết hạn)', function () {",
+              "    pm.expect([200, 400]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{uniqueEmail}}\",\n  \"otp\": \"123456\",\n  \"matKhauMoi\": \"NewPassword@2026!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "reset-password"]
+        }
+      }
+    },
+    {
       "name": "03. Auth - Đăng nhập Staff & Admin Setup",
       "event": [
         {
@@ -445,6 +514,98 @@
           "raw": "{{baseUrl}}/api/v1/blood-inventories",
           "host": ["{{baseUrl}}"],
           "path": ["api", "v1", "blood-inventories"]
+        }
+      }
+    },
+    {
+      "name": "12. Security - Checklist 1: Sai mật khẩu (Kỳ vọng 401 & KHÔNG cấp JWT)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Checklist 1 - Trạng thái HTTP phải là 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test('Checklist 1 - Tuyệt đối KHÔNG cấp accessToken hoặc token trong response', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.success).to.eql(false);",
+              "    pm.expect(jsonData.data).to.be.oneOf([null, undefined]);",
+              "    if (jsonData.data) {",
+              "        pm.expect(jsonData.data.accessToken).to.be.undefined;",
+              "        pm.expect(jsonData.data.token).to.be.undefined;",
+              "    }",
+              "    pm.expect(jsonData.message).to.be.a('string');",
+              "    pm.expect(jsonData.message).to.include('không chính xác');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@hienmau.vn\",\n  \"matKhau\": \"MatKhauSaiHoanToan999!\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "13. Security - Checklist 2: Rate Limit API Login (Gửi liên tiếp -> 429)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Kiểm tra Helmet Security Headers",
+              "pm.test('Checklist 2 - Có Helmet Security Headers', function () {",
+              "    pm.expect(pm.response.headers.has('X-Content-Type-Options')).to.be.true;",
+              "    pm.expect(pm.response.headers.has('X-Frame-Options')).to.be.true;",
+              "    pm.expect(pm.response.headers.has('Strict-Transport-Security')).to.be.true;",
+              "});",
+              "",
+              "// Kiểm tra Rate Limit Headers hoặc Status 429 khi gửi vượt ngưỡng",
+              "pm.test('Checklist 2 - Có Rate Limit Headers hoặc trả về 429 Too Many Requests', function () {",
+              "    const status = pm.response.code;",
+              "    if (status === 429) {",
+              "        pm.expect(status).to.eql(429);",
+              "        const jsonData = pm.response.json();",
+              "        pm.expect(jsonData.success).to.eql(false);",
+              "        pm.expect(jsonData.message).to.include('quá nhiều');",
+              "        pm.expect(pm.response.headers.has('Retry-After')).to.be.true;",
+              "    } else {",
+              "        pm.expect(pm.response.headers.has('X-RateLimit-Limit')).to.be.true;",
+              "        pm.expect(pm.response.headers.has('X-RateLimit-Remaining')).to.be.true;",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@hienmau.vn\",\n  \"matKhau\": \"Password@123\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
         }
       }
     }

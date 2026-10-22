@@ -8,6 +8,16 @@ type ValidationRule = (data: Record<string, unknown>) => string | null;
  */
 export function validateBody(rules: ValidationRule[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
+    if (Array.isArray(req.body)) {
+      return next(
+        AppError.badRequest('Yêu cầu không hợp lệ. Hệ thống chỉ cho phép xử lý duy nhất 1 bản ghi cho mỗi yêu cầu, không cho phép tạo/gửi nhiều tài khoản cùng lúc.')
+      );
+    }
+
+    if (!req.body || typeof req.body !== 'object') {
+      return next(AppError.badRequest('Dữ liệu gửi lên phải là một đối tượng JSON hợp lệ.'));
+    }
+
     const errors: string[] = [];
 
     for (const rule of rules) {
@@ -126,6 +136,17 @@ export const Validators = {
       const num = Number(val);
       if (isNaN(num) || num <= 0) {
         return `'${fieldName}' phải là số dương lớn hơn 0`;
+      }
+      return null;
+    };
+  },
+
+  otp: (field: string = 'otp', fieldName: string = 'Mã OTP'): ValidationRule => {
+    return (data) => {
+      const val = String(data[field] || '').trim();
+      if (!val) return null;
+      if (!/^[0-9]{6}$/.test(val)) {
+        return `'${fieldName}' phải gồm đúng 6 chữ số`;
       }
       return null;
     };

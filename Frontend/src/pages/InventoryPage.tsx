@@ -147,7 +147,7 @@ export const InventoryPage: React.FC = () => {
             <span>Làm mới</span>
           </button>
 
-          {user.role === 'ADMIN' ? (
+          {(user.role === 'ADMIN' || user.role === 'HOSPITAL_STAFF') ? (
             <Link
               to="/admin/inventory"
               className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-md shadow-red-500/20 transition-all shrink-0"
