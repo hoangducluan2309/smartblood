@@ -1,0 +1,16 @@
+# Tự triển khai SmartBlood lên máy chủ khi có commit mới vào main.
+name: Deploy SmartBlood
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: deploy-smartblood
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, smartblood]
+    timeout-minutes: 20
+    steps:
+      - name: Cập nhật máy chủ (kéo mã, build, kiểm tra, tự quay về bản cũ nếu lỗi)
+        run: sudo -n -u ubuntu /usr/local/sbin/smartblood-capnhat
